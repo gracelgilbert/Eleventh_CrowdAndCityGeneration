@@ -26,11 +26,21 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    simulationdriver.cpp
+    simulationdriver.cpp \
+    charsystem.cpp \
+    la.cpp \
+    crowdpatch.cpp \
+    trajectory.cpp
 
 HEADERS += \
         mainwindow.h \
-    simulationdriver.h
+    simulationdriver.h \
+    charsystem.h \
+    la.h \
+    crowdpatch.h \
+    trajectory.h
 
 FORMS += \
         mainwindow.ui
+
+INCLUDEPATH += include
