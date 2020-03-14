@@ -4,6 +4,9 @@
 #include "la.h"
 #include "trajectory.h"
 #include "set"
+#include "boundarypoint.h"
+
+class BoundaryPoint;
 
 class CrowdPatch {
 private:
@@ -15,27 +18,15 @@ private:
     float desiredDensity;
     glm::vec2 desiredDirection;
 
+    std::vector<BoundaryPoint*> entryBPs;
+    std::vector<BoundaryPoint*> exitBPs;
 
-
-//    CrowdPatch leftPatch;
-//    CrowdPatch rightPatch;
-//    CrowdPatch upPatch;
-//    CrowdPatch downPatch;
 
 public:
     CrowdPatch();
     CrowdPatch(glm::vec2 origin, float width, float period, float desiredDensity, glm::vec2 desiredDirection);
 
-    std::vector<glm::vec2> leftIns;
-    std::vector<glm::vec2> leftOuts;
-    std::vector<glm::vec2> rightIns;
-    std::vector<glm::vec2> rightOuts;
-    std::vector<glm::vec2> upIns;
-    std::vector<glm::vec2> upOuts;
-    std::vector<glm::vec2> downIns;
-    std::vector<glm::vec2> downOuts;
-
-
+    ~CrowdPatch();
     glm::vec2 getOrigin();
     float getWidth();
     float getPeriod();
@@ -47,7 +38,12 @@ public:
     // TODO: Make private and add getter/setters and inserts
     std::vector<Trajectory> trajectories;
 
+    void removeCollisions();
 
+    bool minDist(Trajectory T1, Trajectory T2,
+                 glm::vec3 &cp1, glm::vec3 &cp2,
+                 int &segFirst1, int &segFirst2,
+                 float &dist);
 
     void setDesiredDensity(float d);
     void setDesiredDirection(glm::vec2 dir);
@@ -60,6 +56,10 @@ public:
 
     bool isInS(int index);
     bool isInD(int index);
+
+    std::vector<BoundaryPoint*> getEntryBPs();
+    std::vector<BoundaryPoint*> getExitBPs();
+
 
 };
 

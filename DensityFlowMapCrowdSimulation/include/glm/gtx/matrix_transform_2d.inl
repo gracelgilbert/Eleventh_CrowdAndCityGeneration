@@ -79,7 +79,7 @@ namespace glm
 		detail::tmat3x3<T, P> const & m,
 		T const & y)
 	{
-		detail::tmat3x3<T, P> Result();
+                detail::tmat3x3<T, P> Result();
 		Result[0][1] = y;
 		return m * Result;
 	}

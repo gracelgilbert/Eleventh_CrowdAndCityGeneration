@@ -15,6 +15,30 @@ SimulationDriver::SimulationDriver() : dt(0.01), chars(CharSystem())
 //    testPatch.rightIns.insert(glm::vec2(3.0, 5.0));
 }
 
+glm::vec3 mix(glm::vec3 a, glm::vec3 b, float t) {
+    return (1.f - t) * a + t * b;
+}
+
+glm::vec2 vec3ToVec2(glm::vec3 v3) {
+    return glm::vec2(v3[0], v3[1]);
+}
+
+void insertTestTrajectories(CrowdPatch &testPatch) {
+    Trajectory testTrajectory = Trajectory();
+    testTrajectory.insertControlPoint(glm::vec3(50.0, 70.0, 0.0), 0);
+    testTrajectory.insertControlPoint(glm::vec3(160.0, 130.0, 130.0), 1);
+
+    testTrajectory.insertControlPoint(glm::vec3(250.0, 150.0, 255.0), 2);
+
+    Trajectory testT2 = Trajectory();
+    testT2.insertControlPoint(glm::vec3(50.0, 200.0, 0.0), 0);
+    testT2.insertControlPoint(glm::vec3(150.0, 110.0, 150.0), 1);
+    testT2.insertControlPoint(glm::vec3(250.0, 120.0, 240.0), 2);
+
+    testPatch.trajectories.push_back(testTrajectory);
+    testPatch.trajectories.push_back(testT2);
+}
+
 void SimulationDriver::run(const int frameCount) {
     display = QImage(400, 400, QImage::Format_RGB32);
     display.fill(Qt::red);
@@ -26,71 +50,112 @@ void SimulationDriver::run(const int frameCount) {
 
     // Initialize patches and graph
 
-    for (int i = 0; i < numPeriods; ++i) {
-        float error = 1.0;
-        int attemptCount = 0;
+    // Optimize graph I/O points
+
+    float error = 1.0;
+    int attemptCount = 0;
+    // Find optimal paths with current I/O
+    // Calculate error
+
+    while (error > EPSILON && attemptCount < 10) {
+        // Find SCCs and error paths
+        // Update I/O on error paths
         // Find optimal paths with current I/O
         // Calculate error
-        while (error > EPSILON && attemptCount < 10) {
-            // Find SCCs and error paths
-            // Update I/O on error paths
-            // Find optimal paths with current I/O
-            // Calculate error
 
-            // Increment attempt count
-            attemptCount++;
-        }
-        // At this point, each crowd patch will contain initial trajectories from input to output points
-        // Perform collision avoidance on these trajectories within each patch
-        Trajectory testTrajectory = Trajectory();
-        testTrajectory.insertControlPoint(glm::vec3(100.0, 80.0, 250.0), 0);
-        testTrajectory.insertControlPoint(glm::vec3(100.0, 200.0, 255.0), 1);
+        // Increment attempt count
+        attemptCount++;
+    }
 
+    // Temporary test trajectories:
+    insertTestTrajectories(testPatch);
 
+    // At this point, each crowd patch will contain initial trajectories from input to output points
+    // Perform collision avoidance on these trajectories within each patch
+    // Endpoints of trajectories are set
+    // Remove collisions
+    testPatch.removeCollisions();
 
+    // Add control points to straighten out spline
+    for (int i = 0; i < (int) testPatch.trajectories.size(); ++i) {
+        testPatch.trajectories.at(i).straighten(2);
+    }
 
-        testPatch.trajectories.push_back(testTrajectory);
-
-
-
+    // Animate characters along the trajectories
+    for (int p = 0; p < numPeriods; ++p) {
+        // Interpolate and render points
         for (int j = 0; j < framesPerPeriod; ++j) {
-            int currFrame = framesPerPeriod * i + j;
-            std::cout << "Frame " << j << std::endl;
-//            float interpRatio = (float) j / (float) framesPerPeriod;
-
-            for (Trajectory T : testPatch.trajectories) {
-                // This will be spline interpolation, bezier curves?
-                glm::vec3 cp1 = T.getControlPointAtIndex(0);
-                glm::vec3 cp2 = T.getControlPointAtIndex(1);
-                if (j < cp1[2] || j > cp2[2]) {
-                    continue;
-                }
-
-                float interpRatio = (float) (j - cp1[2]) / (float) (cp2[2] - cp1[2]);
-
-
-                glm::vec3 p = cp2 * interpRatio + cp1 * (1.f - interpRatio);
-                std::cout << "p value " << p[2] << std::endl;
-                // Check to make sure lies within trajectory
-                display.setPixelColor(QPoint(p[0], p[1]), QColor(p[2], p[2], p[2]));
-            }
+            int currFrame = framesPerPeriod * p + j;
+            this->followTrajectories(testPatch.trajectories, j, currFrame);
         }
 
     }
+}
 
+void SimulationDriver::followTrajectories(std::vector<Trajectory> trajectories, int subFrame, int currFrame) {
+    for (Trajectory T : trajectories) {
+        int numControlPoints = T.getNumControlPoints();
+        if (numControlPoints < 2) {
+            continue;
+        }
+
+        glm::vec3 cpFirst = T.getControlPointAtIndex(0);
+        glm::vec3 cpLast = T.getControlPointAtIndex(numControlPoints - 1);
+
+        if (subFrame < cpFirst[2] || subFrame > cpLast[2]) {
+            continue;
+        }
+        // Bezier interpolation
+        this->smoothTrajectory(T, numControlPoints, subFrame, currFrame);
+    }
+}
+
+void SimulationDriver::smoothTrajectory(Trajectory T, int numControlPoints, int subFrame, int currFrame) {
+    for (int seg = 0; seg < numControlPoints - 1; ++seg) {
+        // Check if current frame is within this segment otherwiese continue
+        glm::vec3 cp1 = T.getControlPointAtIndex(seg);
+        glm::vec3 cp2 = T.getControlPointAtIndex(seg + 1);
+        if (subFrame < cp1[2] || subFrame > cp2[2]) {
+            continue;
+        }
+        glm::vec3 cp0 = glm::vec3();
+        glm::vec3 cp3 = glm::vec3();
+
+        if (seg == 0) {
+            // If first segment
+            cp0 = cp1 + (cp1 - cp2);
+        } else {
+            cp0 = T.getControlPointAtIndex(seg - 1);
+        }
+
+        if (seg == numControlPoints - 2) {
+            // If last segment
+            cp3 = cp2 + (cp2 - cp1);
+        } else {
+            cp3 = T.getControlPointAtIndex(seg + 2);
+        }
+
+        glm::vec3 b0 = cp1;
+        glm::vec3 b1 = cp1 + ((1.f / 3.f) * ((cp2 - cp0) / 2.f));
+        glm::vec3 b2 = cp2 - ((1.f / 3.f) * ((cp3 - cp1) / 2.f));
+        glm::vec3 b3 = cp2;
+
+        float interpRatio = (float) (subFrame - cp1[2]) / (float) (cp2[2] - cp1[2]);
+
+        glm::vec3 b01 = mix(b0, b1, interpRatio);
+        glm::vec3 b11 = mix(b1, b2, interpRatio);
+        glm::vec3 b21 = mix(b2, b3, interpRatio);
+
+        glm::vec3 b02 = mix(b01, b11, interpRatio);
+        glm::vec3 b12 = mix(b11, b21, interpRatio);
+
+        glm::vec3 p = mix(b02, b12, interpRatio);
+//      glm::vec3 p = cp2 * interpRatio + cp1 * (1.f - interpRatio);
+        // Check to make sure lies within trajectory
+        display.setPixelColor(QPoint(p[0], p[1]), QColor(currFrame, currFrame, currFrame));
+    }
 }
 
 float SimulationDriver::getDt() {
     return this->dt;
 }
-
-//void SimulationDriver::advanceTimeStep() {
-//    for (int i = 0; i < this->chars.getNumChars(); ++i) {
-
-//        float a = 1.5 * ((2.0 * static_cast <float> (std::rand()) / static_cast <float> (RAND_MAX)) - 1.0);
-//        float b = 1.5 * ((2.0 * static_cast <float> (std::rand()) / static_cast <float> (RAND_MAX)) - 1.0);
-
-//        this->chars.updateIndexPos(i, this->chars.getIndexPos(i) + glm::vec2(a, b));
-//    }
-//}
-
