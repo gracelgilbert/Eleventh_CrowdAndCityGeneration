@@ -1,6 +1,6 @@
 #include "crowdpatch.h"
-#include <iostream>
 
+// Constructors
 CrowdPatch::CrowdPatch() :
     origin(glm::vec2()),
     width(1.0),
@@ -22,16 +22,18 @@ CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
     desiredDirection(glm::vec2(desiredDirection))
 { }
 
+// Destructor
 CrowdPatch::~CrowdPatch() {
     for (BoundaryPoint* bp : this->entryBPs) {
-        delete(bp);
+//        delete(bp);
     }
 
     for (BoundaryPoint* bp : this->exitBPs) {
-        delete(bp);
+//        delete(bp);
     }
 }
 
+// Getters
 glm::vec2 CrowdPatch::getOrigin() {
     return this->origin;
 }
@@ -60,6 +62,24 @@ glm::vec2 CrowdPatch::getDesiredDirection() {
     return glm::normalize(desiredDirection);
 }
 
+std::vector<BoundaryPoint*> CrowdPatch::getEntryBPs() {
+    return this->entryBPs;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getExitBPs() {
+    return this->exitBPs;
+}
+
+std::vector<Trajectory> CrowdPatch::getTrajectories() {
+    return this->trajectories;
+}
+
+Trajectory CrowdPatch::getTrajectoryAt(int index) {
+    return this->trajectories.at(index);
+}
+
+// Setters
+
 void CrowdPatch::setDesiredDensity(float d) {
     this->desiredDensity = d;
 }
@@ -67,6 +87,8 @@ void CrowdPatch::setDesiredDensity(float d) {
 void CrowdPatch::setDesiredDirection(glm::vec2 dir) {
     this->desiredDirection = glm::normalize(dir);
 }
+
+// Modifiers
 
 void CrowdPatch::addIndexS(int index) {
     this->S.push_back(index);
@@ -96,6 +118,14 @@ void CrowdPatch::removeIndexD(int index) {
     }
 }
 
+void CrowdPatch::addEntry(BoundaryPoint *bp) {
+    this->entryBPs.push_back(bp);
+}
+
+void CrowdPatch::addExit(BoundaryPoint *bp) {
+    this->exitBPs.push_back(bp);
+}
+
 bool CrowdPatch::isInS(int index) {
     for (auto it = S.begin(); it != S.end(); ) {
         if (*it == index) {
@@ -118,13 +148,11 @@ bool CrowdPatch::isInD(int index) {
     return false;
 }
 
-std::vector<BoundaryPoint*> CrowdPatch::getEntryBPs() {
-    return this->entryBPs;
+void CrowdPatch::addTrajectory(Trajectory T) {
+    this->trajectories.push_back(T);
 }
 
-std::vector<BoundaryPoint*> CrowdPatch::getExitBPs() {
-    return this->exitBPs;
-}
+// Operations
 
 void CrowdPatch::removeCollisions() {
     int numTrajectories = this->trajectories.size();
@@ -207,7 +235,6 @@ void CrowdPatch::removeCollisions() {
         }
     }
 }
-
 
 bool CrowdPatch::minDist(Trajectory T1, Trajectory T2,
                          glm::vec3 &cp1, glm::vec3 &cp2,
@@ -311,7 +338,64 @@ bool CrowdPatch::minDist(Trajectory T1, Trajectory T2,
 
 }
 
+void CrowdPatch::matchBoundaryPoints() {
+    for (BoundaryPoint* bp : entryBPs) {
+        bp->fillRatingsMap();
+        bp->sortPreferenceList();
+    }
+    for (BoundaryPoint* bp : exitBPs) {
+        bp->fillRatingsMap();
+        bp->sortPreferenceList();
+    }
 
+    // Perform matching
+    bool notDone = true;
+    while (notDone) {
+        notDone = false;
+        for (BoundaryPoint* i : this->entryBPs) {
+            if (i->getStatus() == UNMATCHED) {
+                BoundaryPoint* o = i->getNextProposal();
+                if (o != nullptr) {
+                    // i proposes to o, next on preference list
+                    notDone = true; // if there was a next BP to propose to for any i, then not done
+                    if (o->getStatus() == UNMATCHED) {
+                        // o is unmatched
+                        i->setCurrentMatch(o);
+                        i->setStatus(MATCHED);
+                        o->setCurrentMatch(i);
+                        o->setStatus(MATCHED);
+                    } else {
+                        // o is matched already
+                        BoundaryPoint* iPrime = o->getCurrentMatch();
+                        if (!iPrime) {
+                            std::cout << "error: o is MATCHED and match is null" << std::endl;
+                            continue;
+                        }
+                        float iRank = o->getRating(i);
+                        float iPrimeRank = o->getRating(iPrime);
+                        if (iRank < iPrimeRank) {
+                            // o is with i prime but prefers i
+                            i->setCurrentMatch(o);
+                            i->setStatus(MATCHED);
+                            o->setCurrentMatch(i);
+                            o->setStatus(MATCHED);
+
+                            iPrime->setCurrentMatch(nullptr);
+                            iPrime->setStatus(UNMATCHED);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (BoundaryPoint* bp : entryBPs) {
+        Trajectory T = Trajectory();
+        if (bp->createTrajectory(T)) {
+            this->trajectories.push_back(T);
+        }
+    }
+}
 
 
 
