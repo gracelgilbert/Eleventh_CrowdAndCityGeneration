@@ -3,7 +3,10 @@
 // Constructor
 SimulationDriver::SimulationDriver()
 {
-    testPatch = CrowdPatch(glm::vec2(0.0, 0.0), 200.0, PERIOD, 1.0, glm::vec2(1.0, 1.0));
+    testPatch = CrowdPatch(glm::vec2(0.0, 0.0), 50.0, PERIOD, 1.0, glm::vec2(1.0, 1.0));
+    this->graph = PatchGraph();
+    graph.tempFill();
+
 }
 
 // Helper functions
@@ -32,8 +35,11 @@ void insertTestTrajectories(CrowdPatch &testPatch) {
 }
 
 // Animate characters along interpolated patch trajectories
-void SimulationDriver::followTrajectories(std::vector<Trajectory> trajectories, int subFrame, int currFrame) {
+void SimulationDriver::followTrajectories(std::vector<Trajectory> trajectories,
+                                          int subFrame, int currFrame, std::ofstream &fs,
+                                          int &count) {
     // iterate over all trajectories
+//    int count = 1;
     for (Trajectory T : trajectories) {
         int numControlPoints = T.getNumControlPoints();
         if (numControlPoints < 2) {
@@ -44,22 +50,26 @@ void SimulationDriver::followTrajectories(std::vector<Trajectory> trajectories, 
         glm::vec3 cpFirst = T.getControlPointAtIndex(0);
         glm::vec3 cpLast = T.getControlPointAtIndex(numControlPoints - 1);
 
-        if (subFrame < cpFirst[2] || subFrame > cpLast[2]) {
+        if (subFrame < cpFirst[2] || subFrame >= cpLast[2]) {
             // If frame is outside trajectory time bounds, skip
             continue;
         }
 
         // Bezier interpolation
-        this->smoothTrajectory(T, numControlPoints, subFrame, currFrame);
+        this->smoothTrajectory(T, numControlPoints, subFrame, currFrame, fs, count);
+        count++;
     }
 }
 
-void SimulationDriver::smoothTrajectory(Trajectory T, int numControlPoints, int subFrame, int currFrame) {
+void SimulationDriver::smoothTrajectory(Trajectory T,
+                                        int numControlPoints, int subFrame,
+                                        int currFrame,
+                                        std::ofstream &fs, int count) {
     for (int seg = 0; seg < numControlPoints - 1; ++seg) {
         // Check if current frame is within this segment otherwiese continue
         glm::vec3 cp1 = T.getControlPointAtIndex(seg);
         glm::vec3 cp2 = T.getControlPointAtIndex(seg + 1);
-        if (subFrame < cp1[2] || subFrame > cp2[2]) {
+        if (subFrame < cp1[2] || subFrame >= cp2[2]) {
             continue;
         }
         glm::vec3 cp0 = glm::vec3();
@@ -97,6 +107,8 @@ void SimulationDriver::smoothTrajectory(Trajectory T, int numControlPoints, int 
 
         glm::vec3 p = mix(b02, b12, interpRatio);
 
+        fs << count << ":";
+        fs << " " << p[0] << " " << 0 << " " << p[1] << "\n";
         display.setPixelColor(QPoint(p[0], p[1]), QColor(currFrame, currFrame, currFrame));
     }
 }
@@ -132,24 +144,48 @@ void SimulationDriver::run(const int frameCount) {
         attemptCount++;
     }
 
-    BoundaryPoint bp1 = BoundaryPoint(glm::vec3(testPatch.getOrigin()[0], 3.0 * testPatch.getWidth() / 4.0, 3.0), ENTRY, &testPatch);
-    BoundaryPoint bp2 = BoundaryPoint(glm::vec3(testPatch.getOrigin()[0], testPatch.getWidth() / 4.0, 8.0), ENTRY, &testPatch);
 
-    BoundaryPoint bp3 = BoundaryPoint(glm::vec3(testPatch.getOrigin()[0] + testPatch.getWidth() /  2.0, testPatch.getOrigin()[1] + testPatch.getWidth(), 200.0), EXIT, &testPatch);
-    BoundaryPoint bp4 = BoundaryPoint(glm::vec3(testPatch.getOrigin()[0] + testPatch.getWidth(), testPatch.getWidth() / 4.0, 200.0), EXIT, &testPatch);
+    for (int i = 0; i < XDIM; ++i) {
+        for (int j = 0; j < YDIM; ++j) {
+            CrowdPatch* currPatch = graph.getPatchAt(i, j);
 
-    testPatch.addEntry(&bp1);
-    testPatch.addEntry(&bp2);
+            float ox = currPatch->getOrigin()[0];
+            float oy = currPatch->getOrigin()[1];
+            float w = currPatch->getWidth();
 
-    testPatch.addExit(&bp3);
-    testPatch.addExit(&bp4);
+            BoundaryPoint bp1 = BoundaryPoint(glm::vec3(ox, oy + 3.0 * w / 4.0, 0.0), ENTRY, currPatch);
+            BoundaryPoint bp2 = BoundaryPoint(glm::vec3(ox, oy + w / 4.0, 50.0), ENTRY, currPatch);
 
-    testPatch.matchBoundaryPoints();
+            BoundaryPoint bp3 = BoundaryPoint(glm::vec3(ox + w, oy + w / 2.0, 200.0), EXIT, currPatch);
+            BoundaryPoint bp4 = BoundaryPoint(glm::vec3(ox + w/2.0, oy + w, 250.0), EXIT, currPatch);
+
+            currPatch->addEntry(&bp1);
+            currPatch->addEntry(&bp2);
+
+            currPatch->addExit(&bp3);
+            currPatch->addExit(&bp4);
+
+            currPatch->matchBoundaryPoints();
+//            insertTestTrajectories(*currPatch);
+
+//            currPatch->removeCollisions();
+            for (int p = 0; p < (int) currPatch->getTrajectories().size(); ++p) {
+                currPatch->getTrajectoryAt(p)->straighten(1);
+            }
+        }
+    }
+//    testPatch.addEntry(&bp1);
+//    testPatch.addEntry(&bp2);
+
+//    testPatch.addExit(&bp3);
+//    testPatch.addExit(&bp4);
+
+//    testPatch.matchBoundaryPoints();
 
 
 
     // Temporary test trajectories:
-//    insertTestTrajectories(testPatch);
+    insertTestTrajectories(testPatch);
 
     /*
      * At this point, each crowd patch will contain trajectories from input to output points
@@ -160,16 +196,32 @@ void SimulationDriver::run(const int frameCount) {
     testPatch.removeCollisions();
 
     // Add control points to straighten out spline
-    for (int i = 0; i < (int) testPatch.getTrajectories().size(); ++i) {
-        testPatch.getTrajectoryAt(i).straighten(2);
-    }
+//    for (int i = 0; i < (int) testPatch.getTrajectories().size(); ++i) {
+//        testPatch.getTrajectoryAt(i)->straighten(5);
+//    }
 
     // Animate characters along the trajectories
     for (int p = 0; p < numPeriods; ++p) {
         // Interpolate and render points
         for (int j = 0; j < framesPerPeriod; ++j) {
             int currFrame = framesPerPeriod * p + j;
-            this->followTrajectories(testPatch.getTrajectories(), j, currFrame);
+            std::string filename = "../../../../HoudiniProjects/Eleventh/geo/" + std::to_string(currFrame) + ".poly";
+            std::ofstream fs;
+            fs.open(filename);
+            fs << "POINTS\n";
+            int count = 1;
+            for (int x = 0; x < XDIM; ++x) {
+                for (int y = 0; y < YDIM; ++y) {
+                    CrowdPatch* currPatch = graph.getPatchAt(x, y);
+                    this->followTrajectories(currPatch->getTrajectories(), j, currFrame, fs, count);
+                }
+            }
+//            this->followTrajectories(testPatch.getTrajectories(), j, currFrame, fs, count);
+
+            fs << "POLYS\n";
+            fs << "END\n";
+            fs.close();
+
         }
     }
 }

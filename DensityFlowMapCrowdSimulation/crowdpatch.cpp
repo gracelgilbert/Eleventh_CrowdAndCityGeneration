@@ -8,7 +8,8 @@ CrowdPatch::CrowdPatch() :
     S(std::vector<int>()),
     D(std::vector<int>()),
     desiredDensity(1.0),
-    desiredDirection(glm::vec2(1.0))
+    desiredDirection(glm::vec2(1.0)),
+    error(1.0)
 { }
 
 CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
@@ -74,8 +75,8 @@ std::vector<Trajectory> CrowdPatch::getTrajectories() {
     return this->trajectories;
 }
 
-Trajectory CrowdPatch::getTrajectoryAt(int index) {
-    return this->trajectories.at(index);
+Trajectory* CrowdPatch::getTrajectoryAt(int index) {
+    return &this->trajectories.at(index);
 }
 
 // Setters
@@ -159,7 +160,7 @@ void CrowdPatch::removeCollisions() {
     if (numTrajectories > 1) {
         // Remove Collisions:
         float M[numTrajectories * numTrajectories];
-        float minAllowedDistance = 25.f;
+        float minAllowedDistance = 24.f;
         int counter = 0;
         float minOverallDist = 0.f;
 
@@ -396,6 +397,79 @@ void CrowdPatch::matchBoundaryPoints() {
         }
     }
 }
+
+float CrowdPatch::calculateDensity() {
+    // iterate over patch's period with small dt, find density at that dt and sum
+    float volume = this->width * this->width * this->period;
+    float density = 0.f;
+
+    float dt = 0.1;
+    for (int t = 0; t < this->period; t += dt) {
+        float tDensity = 0.f;
+        for (Trajectory T : this->trajectories) {
+            int numControlPoints = T.getNumControlPoints();
+            if (t > T.getTimeAtIndex(0) && t < T.getTimeAtIndex(numControlPoints - 1)) {
+                tDensity++;
+            }
+        }
+        density += tDensity * dt;
+    }
+    return density / volume;
+}
+
+glm::vec2 CrowdPatch::calculateFlow() {
+    glm::vec2 flow = glm::vec2(0.f);
+    for (Trajectory T : this->trajectories) {
+        glm::vec2 di = T.getDirection();
+        float ti = T.getDuration();
+        flow += ti * di;
+    }
+    return glm::normalize(flow);
+}
+
+Neighbor CrowdPatch::getLeft() {
+    return this->left;
+}
+
+Neighbor CrowdPatch::getRight() {
+    return this->right;
+}
+
+Neighbor CrowdPatch::getUp() {
+    return this->up;
+}
+
+Neighbor CrowdPatch::getDown() {
+    return this->down;
+}
+
+float CrowdPatch::calculateDensityError() {
+    return this->calculateDensity() - this->getDesiredDensity();
+}
+
+float CrowdPatch::calculateFlowError() {
+    return 0.5 * glm::abs(1.f - glm::dot(this->getDesiredDirection(),
+                                   this->calculateFlow()));
+}
+
+float CrowdPatch::calculateError() {
+    float ep = this->calculateDensityError();
+    float ed = this->calculateFlowError();
+    float sign = 1.0;
+    if (ep < 0) {
+        sign = -1.0;
+    }
+    this->error = ep + sign * ed;
+    return this->error;
+}
+
+float CrowdPatch::calculateNeighborWeight(CrowdPatch *cp) {
+    float neighborError = cp->calculateError();
+    float myError = this->calculateError();
+    return neighborError - myError;
+}
+
+
 
 
 

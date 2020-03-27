@@ -29,8 +29,10 @@ public:
     void insertControlPoint(glm::vec3 cp, int insertPos);
 
     // Calculations
+    float getDuration();
     glm::vec2 getVelocity();
     float getSpeed();
+    glm::vec2 getDirection();
 
     // Operations
     void straighten(int amt);

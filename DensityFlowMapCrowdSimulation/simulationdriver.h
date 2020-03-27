@@ -3,8 +3,10 @@
 
 #include <QImage>
 #include <iostream>
+#include <fstream>
 #include "charsystem.h"
 #include "crowdpatch.h"
+#include "patchgraph.h"
 
 #define PERIOD 255.0
 #define EPSILON 0.001
@@ -18,14 +20,19 @@ class SimulationDriver {
 private:
     // Test crowd patch, will eventually be graph of patches
     CrowdPatch testPatch;
+    PatchGraph graph;
 
     // Helper function for collision avoidance
     bool minDist(Trajectory T1, Trajectory T2, glm::vec3 &cp1, glm::vec3 &cp2,
                   int &segFirst1, int &segFirst2, float &dist);
 
     // Animate characters along interpolated patch trajectories
-    void followTrajectories(std::vector<Trajectory> trajectories, int subFrame, int currframe);
-    void smoothTrajectory(Trajectory T, int numControlPoints, int subFrame, int currFrame);
+    void followTrajectories(std::vector<Trajectory> trajectories,
+                            int subFrame, int currframe,
+                            std::ofstream &fs, int &count);
+    void smoothTrajectory(Trajectory T, int numControlPoints,
+                          int subFrame, int currFrame,
+                          std::ofstream &fs, int count);
 
 public:
     // Constructor

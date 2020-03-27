@@ -31,7 +31,8 @@ SOURCES += \
     la.cpp \
     crowdpatch.cpp \
     trajectory.cpp \
-    boundarypoint.cpp
+    boundarypoint.cpp \
+    patchgraph.cpp
 
 HEADERS += \
         mainwindow.h \
@@ -40,7 +41,8 @@ HEADERS += \
     la.h \
     crowdpatch.h \
     trajectory.h \
-    boundarypoint.h
+    boundarypoint.h \
+    patchgraph.h
 
 FORMS += \
         mainwindow.ui

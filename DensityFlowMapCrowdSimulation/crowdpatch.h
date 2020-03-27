@@ -9,6 +9,13 @@
 
 class BoundaryPoint;
 
+class CrowdPatch;
+
+struct Neighbor {
+    CrowdPatch* cp;
+    float weight;
+};
+
 class CrowdPatch {
 
 /*
@@ -37,12 +44,23 @@ private:
     float desiredDensity;
     glm::vec2 desiredDirection;
 
+    // Error
+    float error;
+    float calculateDensityError();
+    float calculateFlowError();
+
     // Entry and exit boundary points
     std::vector<BoundaryPoint*> entryBPs;
     std::vector<BoundaryPoint*> exitBPs;
 
     // Trajectories
     std::vector<Trajectory> trajectories;
+
+    // Neighbors
+    Neighbor left;
+    Neighbor right;
+    Neighbor up;
+    Neighbor down;
 
 public:
     // Constructors and destructors
@@ -65,7 +83,7 @@ public:
     std::vector<BoundaryPoint*> getExitBPs();
 
     std::vector<Trajectory> getTrajectories();
-    Trajectory getTrajectoryAt(int index);
+    Trajectory* getTrajectoryAt(int index);
 
     // Setters
     void setDesiredDensity(float d);
@@ -94,6 +112,19 @@ public:
                  float &dist);
 
     void matchBoundaryPoints();
+
+    float calculateDensity();
+    glm::vec2 calculateFlow();
+
+    // Graph node behaviors
+    Neighbor getLeft();
+    Neighbor getRight();
+    Neighbor getUp();
+    Neighbor getDown();
+
+    // Calculate the weight of the "edge" from this to cp
+    float calculateError();
+    float calculateNeighborWeight(CrowdPatch* cp);
 
 };
 

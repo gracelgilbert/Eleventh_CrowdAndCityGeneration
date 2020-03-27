@@ -32,14 +32,23 @@ void Trajectory::insertControlPoint(glm::vec3 cp, int insertPos) {
 }
 
 // Calculations
+float Trajectory::getDuration() {
+    int numControlPoints = this->getNumControlPoints();
+    return (this->getTimeAtIndex(numControlPoints - 1) - this->getTimeAtIndex(0));
+}
+
 glm::vec2 Trajectory::getVelocity() {
     int numControlPoints = this->getNumControlPoints();
     return (this->getPositionAtIndex(numControlPoints - 1) - this->getPositionAtIndex(0))
-            / (this->getTimeAtIndex(numControlPoints - 1) - this->getTimeAtIndex(0));
+            / this->getDuration();
 }
 
 float Trajectory::getSpeed() {
     return glm::length(this->getVelocity());
+}
+
+glm::vec2 Trajectory::getDirection() {
+    return glm::normalize(this->getVelocity());
 }
 
 // Operations
