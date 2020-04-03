@@ -2,7 +2,7 @@
 #include <iostream>
 
 // Constructor
-Trajectory::Trajectory() : controlPoints(std::vector<glm::vec3>()) {
+Trajectory::Trajectory() : controlPoints(std::vector<glm::vec3>()), parent(nullptr) {
 }
 
 // Getters
@@ -24,6 +24,15 @@ glm::vec2 Trajectory::getPositionAtIndex(int index) {
 
 float Trajectory::getTimeAtIndex(int index) {
     return this->controlPoints.at(index)[2];
+}
+
+CrowdPatch* Trajectory::getParent() {
+    return this->parent;
+}
+
+// Setters
+void Trajectory::setParent(CrowdPatch *p) {
+    this->parent = p;
 }
 
 // Modifiers
@@ -68,5 +77,33 @@ void Trajectory::straighten(int amt) {
             glm::vec3 newCp = cpSecond - interval * j * dir;
             this->insertControlPoint(newCp, currIndex + 1);
         }
+    }
+}
+
+void Trajectory::addBump() {
+    int numControlPoints = this->getNumControlPoints();
+    glm::vec3 cpFirst = this->getControlPointAtIndex(0);
+    glm::vec3 cpLast = this->getControlPointAtIndex(numControlPoints - 1);
+
+    glm::vec2 pos1 = this->getPositionAtIndex(0);
+    glm::vec2 pos2 = this->getPositionAtIndex(numControlPoints - 1);
+
+    if (abs(pos1[0] - pos2[0]) < 0.01) {
+        // Vertical, share x
+        glm::vec2 patchCenter = this->parent->getOrigin() + 0.5f * glm::vec2(this->parent->getWidth());
+        float newY = (pos1[1] + pos2[1]) * 0.5;
+        glm::vec2 dirToCenter = glm::normalize(patchCenter - glm::vec2(pos1[0], newY));
+        glm::vec2 newPos = glm::vec2(pos1[0], newY) + dirToCenter * this->parent->getWidth() * 0.25f;
+        float newTime = 0.5 * (cpFirst[2] + cpLast[2]);
+        this->insertControlPoint(glm::vec3(newPos[0], newPos[1], newTime), 1);
+    }
+    else if (abs(pos1[1] - pos2[1]) < 0.01) {
+        // Horizontal, share y
+        glm::vec2 patchCenter = this->parent->getOrigin() + 0.5f * glm::vec2(this->parent->getWidth());
+        float newX = (pos1[0] + pos2[0]) * 0.5;
+        glm::vec2 dirToCenter = glm::normalize(patchCenter - glm::vec2(newX, pos1[1]));
+        glm::vec2 newPos = glm::vec2(newX, pos1[1]) + dirToCenter * this->parent->getWidth() * 0.25f;
+        float newTime = 0.5 * (cpFirst[2] + cpLast[2]);
+        this->insertControlPoint(glm::vec3(newPos[0], newPos[1], newTime), 1);
     }
 }

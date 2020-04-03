@@ -9,6 +9,8 @@
 
 class BoundaryPoint;
 
+class Trajectory;
+
 class CrowdPatch;
 
 struct Neighbor {
@@ -40,6 +42,10 @@ private:
     std::vector<int> S;
     std::vector<int> D;
 
+    // state
+    bool visited;
+    float distance;
+
     // Target density and direction
     float desiredDensity;
     glm::vec2 desiredDirection;
@@ -57,10 +63,12 @@ private:
     std::vector<Trajectory> trajectories;
 
     // Neighbors
-    Neighbor left;
-    Neighbor right;
-    Neighbor up;
-    Neighbor down;
+    CrowdPatch* left;
+    CrowdPatch* right;
+    CrowdPatch* up;
+    CrowdPatch* down;
+
+    CrowdPatch* parent;
 
 public:
     // Constructors and destructors
@@ -76,6 +84,12 @@ public:
     std::vector<int> getS();
     std::vector<int> getD();
 
+    bool isVisited();
+    float getDistance();
+    CrowdPatch* getParent();
+
+    float getError();
+
     float getDesiredDensity();
     glm::vec2 getDesiredDirection();
 
@@ -88,6 +102,9 @@ public:
     // Setters
     void setDesiredDensity(float d);
     void setDesiredDirection(glm::vec2 dir);
+    void setVistState(bool state);
+    void setDistance(float distance);
+    void setParent(CrowdPatch* p);
 
     // Modifiers
     void addIndexS(int index);
@@ -104,6 +121,8 @@ public:
 
     void addTrajectory(Trajectory T);
 
+    void reset();
+
     // Operations
     void removeCollisions();
     bool minDist(Trajectory T1, Trajectory T2,
@@ -117,14 +136,21 @@ public:
     glm::vec2 calculateFlow();
 
     // Graph node behaviors
-    Neighbor getLeft();
-    Neighbor getRight();
-    Neighbor getUp();
-    Neighbor getDown();
+    CrowdPatch* getLeft();
+    CrowdPatch* getRight();
+    CrowdPatch* getUp();
+    CrowdPatch* getDown();
+
+    void setLeft(CrowdPatch* l);
+    void setRight(CrowdPatch* r);
+    void setUp(CrowdPatch* u);
+    void setDown(CrowdPatch* d);
 
     // Calculate the weight of the "edge" from this to cp
     float calculateError();
     float calculateNeighborWeight(CrowdPatch* cp);
+
+    void clearVecs();
 
 };
 

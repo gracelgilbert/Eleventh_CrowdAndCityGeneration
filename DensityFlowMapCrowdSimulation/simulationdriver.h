@@ -9,7 +9,7 @@
 #include "patchgraph.h"
 
 #define PERIOD 255.0
-#define EPSILON 0.001
+#define EPSILON 0.1
 
 class SimulationDriver {
 /*

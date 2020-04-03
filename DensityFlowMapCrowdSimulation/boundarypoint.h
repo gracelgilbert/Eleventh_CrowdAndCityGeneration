@@ -8,6 +8,7 @@
 #include "crowdpatch.h"
 
 class CrowdPatch;
+class Trajectory;
 
 // Specifies type of boundary point, entry or exit
 enum TYPE {
@@ -39,6 +40,8 @@ private:
     glm::vec3 position;
     TYPE type;
     CrowdPatch* parentPatch;
+    BoundaryPoint* neighbor;
+    Trajectory* trajectory;
 
     // State
     STATUS status;
@@ -61,6 +64,9 @@ public:
     // Getters
     glm::vec3 getPos();
     TYPE getType();
+    CrowdPatch* getParent();
+    BoundaryPoint* getNeighbor();
+    Trajectory* getTrajectory();
 
     STATUS getStatus();
     BoundaryPoint* getCurrentMatch();
@@ -74,6 +80,9 @@ public:
     // Setters
     void setPos(glm::vec3 position);
     void setType(TYPE newType);
+    void setNeighbor(BoundaryPoint* n);
+    void setParent(CrowdPatch* p);
+    void setTrajectory(Trajectory* t);
 
     void setStatus(STATUS newStatus);
     bool setCurrentMatch(BoundaryPoint* newMatch);

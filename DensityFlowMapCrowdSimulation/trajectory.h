@@ -2,6 +2,9 @@
 #define TRAJECTORY_H
 
 #include "la.h"
+#include "crowdpatch.h"
+
+class CrowdPatch;
 
 class Trajectory {
 
@@ -14,6 +17,8 @@ class Trajectory {
 private:
     // Store control points
     std::vector<glm::vec3> controlPoints;
+
+    CrowdPatch* parent;
 public:
     // Constructor
     Trajectory();
@@ -24,6 +29,10 @@ public:
     int getNumControlPoints();
     glm::vec2 getPositionAtIndex(int index);
     float getTimeAtIndex(int index);
+    CrowdPatch* getParent();
+
+    // Setters
+    void setParent(CrowdPatch* p);
 
     // Modifiers
     void insertControlPoint(glm::vec3 cp, int insertPos);
@@ -36,6 +45,7 @@ public:
 
     // Operations
     void straighten(int amt);
+    void addBump();
 
 };
 

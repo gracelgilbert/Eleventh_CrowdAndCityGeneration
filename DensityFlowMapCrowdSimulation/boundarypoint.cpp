@@ -4,12 +4,14 @@
 BoundaryPoint::BoundaryPoint(glm::vec3 pos, TYPE type, CrowdPatch* parentPatch) :
     position(pos),
     type(type),
-    status(UNMATCHED),
-    preferenceList(std::vector<BoundaryPoint*>()),
-    currentMatch(nullptr),
     parentPatch(parentPatch),
+    neighbor(nullptr),
+    trajectory(nullptr),
+    status(UNMATCHED),
+    currentMatch(nullptr),
     counter(0),
-    done(false)
+    done(false),
+    preferenceList(std::vector<BoundaryPoint*>())
 { }
 
 // Destructor
@@ -28,6 +30,18 @@ glm::vec3 BoundaryPoint::getPos() {
 
 TYPE BoundaryPoint::getType() {
     return this->type;
+}
+
+CrowdPatch* BoundaryPoint::getParent() {
+    return this->parentPatch;
+}
+
+BoundaryPoint* BoundaryPoint::getNeighbor() {
+    return this->neighbor;
+}
+
+Trajectory* BoundaryPoint::getTrajectory() {
+    return this->trajectory;
 }
 
 STATUS BoundaryPoint::getStatus() {
@@ -58,6 +72,18 @@ void BoundaryPoint::setPos(glm::vec3 position) {
 
 void BoundaryPoint::setType(TYPE newType) {
     this->type = newType;
+}
+
+void BoundaryPoint::setNeighbor(BoundaryPoint *n) {
+    this->neighbor = n;
+}
+
+void BoundaryPoint::setParent(CrowdPatch *p) {
+    this->parentPatch = p;
+}
+
+void BoundaryPoint::setTrajectory(Trajectory *t) {
+    this->trajectory = t;
 }
 
 void BoundaryPoint::setStatus(STATUS newStatus) {
@@ -183,7 +209,7 @@ float BoundaryPoint::findPenalty(BoundaryPoint *bp) {
             return 0.0;
         }
 
-        if (isOn(bp, ymax, 0)) {
+        if (isOn(bp, ymax, 1)) {
             // if bp is also on ymax
             return 4.0;
         }
@@ -239,6 +265,8 @@ bool BoundaryPoint::createTrajectory(Trajectory& T) {
     if (this->type == ENTRY) {
         T.insertControlPoint(this->position, 0);
         T.insertControlPoint(this->currentMatch->position, 1);
+        this->setTrajectory(&T);
+        this->currentMatch->setTrajectory(&T);
         return true;
     } else {
         return false;

@@ -2,17 +2,18 @@
 #define PATCHGRAPH_H
 
 #include <array>
+#include <set>
 #include "crowdpatch.h"
 #include "math.h"
+#include <time.h>
 
-#define XDIM 1
-#define YDIM 1
+#define XDIM 2
+#define YDIM 2
 
 class PatchGraph {
 
 private:
     int numPatches;
-//    CrowdPatch graph[XDIM * YDIM];
     std::array<CrowdPatch*, XDIM * YDIM> graph;
 
     float totalError;
@@ -22,6 +23,9 @@ private:
     float calculateFlowError();
 
 public:
+    void tempFill();
+
+
     // Constructors
     // Eventually will pass in an image to the constructor to fill the graph
     PatchGraph();
@@ -39,11 +43,22 @@ public:
     // Operations
     float calculateError();
 
+    void resetTrajectories();
+
     std::vector<CrowdPatch*> getOptimaMinCostPath(std::vector<CrowdPatch*> optima);
 
     std::vector<CrowdPatch*> getPairMinCostPath(CrowdPatch* cpSource, CrowdPatch* cpTarget);
 
-    void tempFill();
+    std::vector<CrowdPatch*> findMinima();
+
+    std::vector<CrowdPatch*> findMaxima();
+
+    void addBPsAlongPath(std::vector<CrowdPatch*> path);
+
+    void removeBPsAlongPath(std::vector<CrowdPatch*> path);
+
+
+
 
 };
 

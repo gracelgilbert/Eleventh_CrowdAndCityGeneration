@@ -7,9 +7,19 @@ CrowdPatch::CrowdPatch() :
     period(1.0),
     S(std::vector<int>()),
     D(std::vector<int>()),
+    visited(false),
+    distance(FLT_MAX),
     desiredDensity(1.0),
     desiredDirection(glm::vec2(1.0)),
-    error(1.0)
+    error(1.0),
+    entryBPs(std::vector<BoundaryPoint*>()),
+    exitBPs(std::vector<BoundaryPoint*>()),
+    trajectories(std::vector<Trajectory>()),
+    parent(nullptr),
+    left(nullptr),
+    right(nullptr),
+    up(nullptr),
+    down(nullptr)
 { }
 
 CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
@@ -19,19 +29,30 @@ CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
     period(period),
     S(std::vector<int>()),
     D(std::vector<int>()),
+    visited(false),
+    distance(FLT_MAX),
     desiredDensity(desiredDensity),
-    desiredDirection(glm::vec2(desiredDirection))
+    desiredDirection(glm::vec2(desiredDirection)),
+    error(1.0),
+    entryBPs(std::vector<BoundaryPoint*>()),
+    exitBPs(std::vector<BoundaryPoint*>()),
+    trajectories(std::vector<Trajectory>()),
+    parent(nullptr),
+    left(nullptr),
+    right(nullptr),
+    up(nullptr),
+    down(nullptr)
 { }
 
 // Destructor
 CrowdPatch::~CrowdPatch() {
-    for (BoundaryPoint* bp : this->entryBPs) {
-//        delete(bp);
-    }
+//    for (BoundaryPoint* bp : this->entryBPs) {
+////        delete(bp);
+//    }
 
-    for (BoundaryPoint* bp : this->exitBPs) {
-//        delete(bp);
-    }
+//    for (BoundaryPoint* bp : this->exitBPs) {
+////        delete(bp);
+//    }
 }
 
 // Getters
@@ -53,6 +74,22 @@ std::vector<int> CrowdPatch::getS() {
 
 std::vector<int> CrowdPatch::getD() {
     return this->D;
+}
+
+bool CrowdPatch::isVisited() {
+    return this->visited;
+}
+
+float CrowdPatch::getDistance() {
+    return this->distance;
+}
+
+CrowdPatch* CrowdPatch::getParent() {
+    return this->parent;
+}
+
+float CrowdPatch::getError() {
+    return this->error;
 }
 
 float CrowdPatch::getDesiredDensity() {
@@ -87,6 +124,18 @@ void CrowdPatch::setDesiredDensity(float d) {
 
 void CrowdPatch::setDesiredDirection(glm::vec2 dir) {
     this->desiredDirection = glm::normalize(dir);
+}
+
+void CrowdPatch::setVistState(bool state) {
+    this->visited = state;
+}
+
+void CrowdPatch::setDistance(float distance) {
+    this->distance = distance;
+}
+
+void CrowdPatch::setParent(CrowdPatch *p) {
+    this->parent = p;
 }
 
 // Modifiers
@@ -153,6 +202,12 @@ void CrowdPatch::addTrajectory(Trajectory T) {
     this->trajectories.push_back(T);
 }
 
+void CrowdPatch::reset() {
+    this->visited = false;
+    this->distance = FLT_MAX;
+    this->parent = nullptr;
+}
+
 // Operations
 
 void CrowdPatch::removeCollisions() {
@@ -160,7 +215,7 @@ void CrowdPatch::removeCollisions() {
     if (numTrajectories > 1) {
         // Remove Collisions:
         float M[numTrajectories * numTrajectories];
-        float minAllowedDistance = 24.f;
+        float minAllowedDistance = 2.f;
         int counter = 0;
         float minOverallDist = 0.f;
 
@@ -216,7 +271,7 @@ void CrowdPatch::removeCollisions() {
                 float xSpeed = xTraj.getSpeed();
                 float ySpeed = yTraj.getSpeed();
 
-                glm::vec3 Fx = dPxy * minAllowedDistance / 0.5f /** minAllowedDistance * minAllowedDistance*/;
+                glm::vec3 Fx = dPxy * minAllowedDistance;  // /** minAllowedDistance * minAllowedDistance*/;
 
                 glm::vec3 pxNew = minCPx + Fx * (ySpeed / (xSpeed + ySpeed));
                 glm::vec3 pyNew = minCPy - Fx * (xSpeed / (xSpeed + ySpeed));
@@ -230,7 +285,6 @@ void CrowdPatch::removeCollisions() {
 
                 this->trajectories.at(minx).insertControlPoint(pxNew, minSegFirstx + 1);
                 this->trajectories.at(miny).insertControlPoint(pyNew, minSegFirsty + 1);
-                std::cout << pxNew[0] << ", " << pxNew[1] << ", " << pxNew[2] << std::endl;
             }
             counter++;
         }
@@ -393,6 +447,7 @@ void CrowdPatch::matchBoundaryPoints() {
     for (BoundaryPoint* bp : entryBPs) {
         Trajectory T = Trajectory();
         if (bp->createTrajectory(T)) {
+            T.setParent(this);
             this->trajectories.push_back(T);
         }
     }
@@ -403,7 +458,7 @@ float CrowdPatch::calculateDensity() {
     float volume = this->width * this->width * this->period;
     float density = 0.f;
 
-    float dt = 0.1;
+    float dt = 1.0;
     for (int t = 0; t < this->period; t += dt) {
         float tDensity = 0.f;
         for (Trajectory T : this->trajectories) {
@@ -418,6 +473,9 @@ float CrowdPatch::calculateDensity() {
 }
 
 glm::vec2 CrowdPatch::calculateFlow() {
+    if (this->trajectories.size() < 1) {
+        return glm::vec2(0.0);
+    }
     glm::vec2 flow = glm::vec2(0.f);
     for (Trajectory T : this->trajectories) {
         glm::vec2 di = T.getDirection();
@@ -427,20 +485,36 @@ glm::vec2 CrowdPatch::calculateFlow() {
     return glm::normalize(flow);
 }
 
-Neighbor CrowdPatch::getLeft() {
+CrowdPatch* CrowdPatch::getLeft() {
     return this->left;
 }
 
-Neighbor CrowdPatch::getRight() {
+CrowdPatch* CrowdPatch::getRight() {
     return this->right;
 }
 
-Neighbor CrowdPatch::getUp() {
+CrowdPatch* CrowdPatch::getUp() {
     return this->up;
 }
 
-Neighbor CrowdPatch::getDown() {
+CrowdPatch* CrowdPatch::getDown() {
     return this->down;
+}
+
+void CrowdPatch::setLeft(CrowdPatch* l) {
+    this->left = l;
+}
+
+void CrowdPatch::setRight(CrowdPatch* r) {
+    this->right = r;
+}
+
+void CrowdPatch::setUp(CrowdPatch* u) {
+    this->up = u;
+}
+
+void CrowdPatch::setDown(CrowdPatch* d) {
+    this->down = d;
 }
 
 float CrowdPatch::calculateDensityError() {
@@ -448,8 +522,13 @@ float CrowdPatch::calculateDensityError() {
 }
 
 float CrowdPatch::calculateFlowError() {
-    return 0.5 * glm::abs(1.f - glm::dot(this->getDesiredDirection(),
-                                   this->calculateFlow()));
+    glm::vec2 desiredDir = this->getDesiredDirection();
+    glm::vec2 flow = this->calculateFlow();
+    float dot = glm::dot(flow, desiredDir);
+    if (glm::abs(dot) < 0.01) {
+        dot = 0;
+    }
+    return 0.5 * glm::abs(1.f - dot);
 }
 
 float CrowdPatch::calculateError() {
@@ -466,9 +545,15 @@ float CrowdPatch::calculateError() {
 float CrowdPatch::calculateNeighborWeight(CrowdPatch *cp) {
     float neighborError = cp->calculateError();
     float myError = this->calculateError();
-    return neighborError - myError;
+    return glm::abs(neighborError - myError);
 }
 
+
+void CrowdPatch::clearVecs() {
+//    this->entryBPs.clear();
+//    this->exitBPs.clear();
+    this->trajectories.clear();
+}
 
 
 

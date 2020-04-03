@@ -27,7 +27,6 @@ SOURCES += \
         main.cpp \
         mainwindow.cpp \
     simulationdriver.cpp \
-    charsystem.cpp \
     la.cpp \
     crowdpatch.cpp \
     trajectory.cpp \
@@ -37,7 +36,6 @@ SOURCES += \
 HEADERS += \
         mainwindow.h \
     simulationdriver.h \
-    charsystem.h \
     la.h \
     crowdpatch.h \
     trajectory.h \
