@@ -17,6 +17,8 @@
 #include <QMatrix4x4>
 #include<QVector4D>
 
+#include <QImage>
+
 #include "set"
 
 /// 460 linear algebra namespace. Functions used to convert glm data types to Qt data types

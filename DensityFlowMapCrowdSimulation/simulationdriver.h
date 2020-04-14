@@ -1,7 +1,6 @@
 #ifndef SIMULATIONDRIVER_H
 #define SIMULATIONDRIVER_H
 
-#include <QImage>
 #include <iostream>
 #include <fstream>
 #include "charsystem.h"
@@ -30,7 +29,7 @@ private:
     void followTrajectories(std::vector<Trajectory> trajectories,
                             int subFrame, int currframe,
                             std::ofstream &fs, int &count);
-    void smoothTrajectory(Trajectory T, int numControlPoints,
+    bool smoothTrajectory(Trajectory T, int numControlPoints,
                           int subFrame, int currFrame,
                           std::ofstream &fs, int count);
 

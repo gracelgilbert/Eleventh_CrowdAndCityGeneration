@@ -1,5 +1,5 @@
 #include "crowdpatch.h"
-
+#include <glm/gtx/matrix_transform_2d.hpp>
 // Constructors
 CrowdPatch::CrowdPatch() :
     origin(glm::vec2()),
@@ -97,6 +97,9 @@ float CrowdPatch::getDesiredDensity() {
 }
 
 glm::vec2 CrowdPatch::getDesiredDirection() {
+    if (glm::length(desiredDirection) < 0.01) {
+        return glm::vec2(0.0);
+    }
     return glm::normalize(desiredDirection);
 }
 
@@ -168,6 +171,24 @@ void CrowdPatch::removeIndexD(int index) {
     }
 }
 
+void CrowdPatch::removeEntry(BoundaryPoint *bp) {
+    for (int i = 0; i < this->entryBPs.size(); ++i) {
+        if (this->entryBPs.at(i) == bp) {
+            entryBPs.erase(entryBPs.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeExit(BoundaryPoint *bp) {
+    for (int i = 0; i < this->exitBPs.size(); ++i) {
+        if (this->exitBPs.at(i) == bp) {
+            exitBPs.erase(exitBPs.begin() + i);
+            return;
+        }
+    }
+}
+
 void CrowdPatch::addEntry(BoundaryPoint *bp) {
     this->entryBPs.push_back(bp);
 }
@@ -214,49 +235,54 @@ void CrowdPatch::removeCollisions() {
     int numTrajectories = this->trajectories.size();
     if (numTrajectories > 1) {
         // Remove Collisions:
-        float M[numTrajectories * numTrajectories];
-        float minAllowedDistance = 2.f;
+//        float M[numTrajectories * numTrajectories];
+        float minAllowedDistance = 40.f;
         int counter = 0;
         float minOverallDist = 0.f;
 
         while (minOverallDist < minAllowedDistance && counter < 100) {
             // Will get out minimum distance and the trajectory points that got this distance
-            float minDist = FLT_MAX;
-            glm::vec3 minCPx = glm::vec3(0.0);
-            glm::vec3 minCPy = glm::vec3(0.0);
-            int minx = 0;
-            int miny = 0;
-            int minSegFirstx = 0;
-            int minSegFirsty = 0;
+            float minDist = FLT_MAX; // Min dist between two trajectories
+            glm::vec3 minCPx = glm::vec3(0.0); // Position/time on trajectory x of min dist
+            glm::vec3 minCPy = glm::vec3(0.0); // Position/time on trajectory y of min dist
+            int minx = 0; // index of trajectory x with min dist
+            int miny = 0; // index of trajectory y with min dist
+            int minSegFirstx = 0; // index of first cp of segment on trajectory x with min dist
+            int minSegFirsty = 0; // index of first cp of segment on trajectory y with min dist
 
 
             // Iterate over all trajectories
             for (int x = 0; x < numTrajectories; ++x) {
                 for (int y = 0; y < numTrajectories; ++y) {
                     // Find current shortest distance between trajectory x and y
-                    int arrayIndex = x + numTrajectories * y;
-                    if (x == y) {
+//                    int arrayIndex = x + numTrajectories * y;
+                    if (y <= x) {
                         // trajectories are the same, minimum distance is 0
-                        M[arrayIndex] = 0;
+                        // Or already checked this pair
+                        continue;
+//                        M[arrayIndex] = 0;
                     } else {
+                        // Get the two trajectories
                         Trajectory T1 = this->trajectories.at(x);
                         Trajectory T2 = this->trajectories.at(y);
-                        glm::vec3 cpx;
+                        // Set up variables to get out of trajectory pair
+                        glm::vec3 cpx; // position of collision
                         glm::vec3 cpy;
-                        int segFirstx = 0;
+                        int segFirstx = 0; // index of segment of collision
                         int segFirsty = 0;
-                        float currTrajectoryPairDist = 0.f;
+                        float currTrajectoryPairDist = 0.f; // distance of collision
 
-                        if (this->minDist(T1, T2, cpx, cpy, segFirstx, segFirsty, currTrajectoryPairDist))
-                        M[arrayIndex] = currTrajectoryPairDist;
-                        if (M[arrayIndex] < minDist) {
-                            minDist = M[arrayIndex];
-                            minCPx = cpx;
-                            minCPy = cpy;
-                            minx = x;
-                            miny = y;
-                            minSegFirstx = segFirstx;
-                            minSegFirsty = segFirsty;
+                        if (this->minDist(T1, T2, cpx, cpy, segFirstx, segFirsty, currTrajectoryPairDist)) {
+//                        M[arrayIndex] = currTrajectoryPairDist;
+                            if (currTrajectoryPairDist < minDist) {
+                                minDist = currTrajectoryPairDist;
+                                minCPx = cpx;
+                                minCPy = cpy;
+                                minx = x;
+                                miny = y;
+                                minSegFirstx = segFirstx;
+                                minSegFirsty = segFirsty;
+                            }
                         }
                     }
                 }
@@ -268,20 +294,31 @@ void CrowdPatch::removeCollisions() {
                 Trajectory xTraj = this->trajectories.at(minx);
                 Trajectory yTraj = this->trajectories.at(miny);
 
+                float alpha = std::min(minAllowedDistance * 2.0, 2.0);
+
                 float xSpeed = xTraj.getSpeed();
                 float ySpeed = yTraj.getSpeed();
 
-                glm::vec3 Fx = dPxy * minAllowedDistance;  // /** minAllowedDistance * minAllowedDistance*/;
+                float wx = (ySpeed / (xSpeed + ySpeed));
+                float wy = (xSpeed / (xSpeed + ySpeed));
 
-                glm::vec3 pxNew = minCPx + Fx * (ySpeed / (xSpeed + ySpeed));
-                glm::vec3 pyNew = minCPy - Fx * (xSpeed / (xSpeed + ySpeed));
+                float phi =  (static_cast <float> (std::rand()) / (static_cast <float> (RAND_MAX))) - 0.5;
+                glm::mat3 rot = glm::rotate(glm::mat3(), phi);
+
+                glm::vec3 Fx = rot * dPxy * alpha;  // /** minAllowedDistance * minAllowedDistance*/;
+
+                glm::vec3 pxNew = minCPx + Fx * wx;
+                glm::vec3 pyNew = minCPy - Fx * wy;
 
                 float timex = xTraj.getTimeAtIndex(minSegFirstx) + xTraj.getTimeAtIndex(minSegFirstx + 1);
                 timex *= 0.5;
                 float timey = yTraj.getTimeAtIndex(minSegFirsty) + yTraj.getTimeAtIndex(minSegFirsty + 1);
                 timey *= 0.5;
-                pxNew[2] = 0.5 * (pxNew[2] + timex);
-                pyNew[2] = 0.5 * (pyNew[2] + timey);
+//                pxNew[2] = 0.5 * (pxNew[2] + timex);
+//                pyNew[2] = 0.5 * (pyNew[2] + timey);
+                pxNew[2] = timex;
+                pyNew[2] = timey;
+
 
                 this->trajectories.at(minx).insertControlPoint(pxNew, minSegFirstx + 1);
                 this->trajectories.at(miny).insertControlPoint(pyNew, minSegFirsty + 1);
@@ -295,20 +332,40 @@ bool CrowdPatch::minDist(Trajectory T1, Trajectory T2,
                          glm::vec3 &cp1, glm::vec3 &cp2,
                          int &segFirst1, int &segFirst2,
                          float &dist) {
+    int period = this->getPeriod();
 
     int numControlPoints1 = T1.getNumControlPoints();
     int numControlPoints2 = T2.getNumControlPoints();
 
-    glm::vec3 cpFirst1 = T1.getControlPointAtIndex(0);
-    glm::vec3 cpFirst2 = T2.getControlPointAtIndex(0);
+    glm::vec3 T1Start = T1.getControlPointAtIndex(0);
+    glm::vec3 T2Start = T2.getControlPointAtIndex(0);
 
-    glm::vec3 cpLast1 = T1.getControlPointAtIndex(numControlPoints1 - 1);
-    glm::vec3 cpLast2 = T2.getControlPointAtIndex(numControlPoints2 - 1);
+    glm::vec3 T1End = T1.getControlPointAtIndex(numControlPoints1 - 1);
+    glm::vec3 T2End = T2.getControlPointAtIndex(numControlPoints2 - 1);
 
-    // If trajectories don't overlap at all, return infinity
-    if (cpFirst1[2] > cpLast2[2] || cpFirst2[2] > cpLast1[2]) {
-        return false;
-    }
+    // If trajectories don't overlap at all, return false
+
+//    if (T1Start[2] > T1End[2]) {
+//        if (!(T2Start[2] <= T1End[2] || T2Start[2] >= T1Start[2] ||
+//                T2End[2] <= T1End[2] || T2End[2] >= T1Start[2])) {
+//            return false;
+//        }
+//    }
+
+//    if (T2Start[2] > T2End[2]) {
+//        if (!(T1Start[2] <= T2End[2] || T1Start[2] >= T2Start[2] ||
+//                T1End[2] <= T2End[2] || T1End[2] >= T2Start[2])) {
+//            return false;
+//        }
+//    }
+
+//    if (T1Start[2] < T1End[2] && T2Start[2] < T2End[2]) {
+        if (T1Start[2] > T2End[2] || T2Start[2] > T1End[2]) {
+            return false;
+        }
+//    }
+
+
 
     float minDist = FLT_MAX;
     for (int s1 = 0; s1 < numControlPoints1 - 1; ++s1) {
@@ -329,12 +386,55 @@ bool CrowdPatch::minDist(Trajectory T1, Trajectory T2,
 
 
             // If segment pair does not overlap, skip over it:
-            if (ts1 > te2 || ts2 > te1) {
-                continue;
-            }
+//            if (ts1 > te2 || ts2 > te1) {
+//                continue;
+//            }
+//            if (ts1 > te1) {
+//                if (!(ts2 <= te1 || ts2 >= ts1 ||
+//                        te2 <= te1 || te2 >= ts1)) {
+//                    continue;
+//                }
+//            }
+
+//            if (ts2 > te2) {
+//                if (!(ts1 <= te2 || ts1 >= ts2 ||
+//                        te1 <= te2 || te1 >= ts2)) {
+//                    continue;
+//                }
+//            }
+
+//            if (ts1 <= te1 && ts2 <= te2) {
+                if (ts1 > te2 || ts2 > te1) {
+                    continue;
+                }
+//            }
+
+
 
             float ts = std::max(ts1, ts2);
             float te = std::min(te1, te2);
+
+//            if (ts1 <= te1 && ts2 <= te2) {
+//                // Both are start then finish
+//                ts = std::max(ts1, ts2);
+//                te = std::min(te1, te2);
+//            }
+//            else if (ts1 > te1) {
+//                if (ts2 > te2) {
+//                    // Both are finish then start
+//                    te1 += period;
+//                    te2 += period;
+//                    ts = std::max(ts1, ts2);
+//                    te = std::min(te1, te2);
+//                } else {
+//                    // Only first section is over period
+//                    te1 += period;
+
+
+//                }
+//            } else {
+//                // Only second section is over period
+//            }
 
             glm::vec2 v1 = (1.f / (te1 - ts1)) * (seg1End - seg1Start);
             glm::vec2 v2 = (1.f / (te2 - ts2)) * (seg2End - seg2Start);
@@ -401,6 +501,10 @@ void CrowdPatch::matchBoundaryPoints() {
     for (BoundaryPoint* bp : exitBPs) {
         bp->fillRatingsMap();
         bp->sortPreferenceList();
+    }
+    if (entryBPs.size() != exitBPs.size()) {
+        return;
+        std::cout << "help" << std::endl;
     }
 
     // Perform matching
@@ -553,6 +657,159 @@ void CrowdPatch::clearVecs() {
 //    this->entryBPs.clear();
 //    this->exitBPs.clear();
     this->trajectories.clear();
+}
+
+
+
+std::vector<BoundaryPoint*> CrowdPatch::getLeftEntries() {
+    return this->leftEntries;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getRightEntries() {
+    return this->rightEntries;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getUpEntries() {
+    return this->upEntries;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getDownEntries() {
+    return this->downEntries;
+}
+
+
+std::vector<BoundaryPoint*> CrowdPatch::getLeftExits() {
+    return this->leftExits;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getRightExits() {
+    return this->rightExits;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getUpExits() {
+    return this->upExits;
+}
+
+std::vector<BoundaryPoint*> CrowdPatch::getDownExits() {
+    return this->downExits;
+}
+
+
+
+
+
+void CrowdPatch::addLeftEntry(BoundaryPoint* bp) {
+    this->leftEntries.push_back(bp);
+}
+
+void CrowdPatch::addRightEntry(BoundaryPoint* bp) {
+    this->rightEntries.push_back(bp);
+}
+
+void CrowdPatch::addUpEntry(BoundaryPoint* bp) {
+    this->upEntries.push_back(bp);
+}
+
+void CrowdPatch::addDownEntry(BoundaryPoint* bp) {
+    this->downEntries.push_back(bp);
+}
+
+
+void CrowdPatch::addLeftExit(BoundaryPoint* bp) {
+    this->leftExits.push_back(bp);
+}
+
+void CrowdPatch::addRightExit(BoundaryPoint* bp) {
+    this->rightExits.push_back(bp);
+}
+
+void CrowdPatch::addUpExit(BoundaryPoint* bp) {
+    this->upExits.push_back(bp);
+}
+
+void CrowdPatch::addDownExit(BoundaryPoint* bp) {
+    this->downExits.push_back(bp);
+}
+
+void CrowdPatch::removeFromVector(std::vector<BoundaryPoint *> bpVec, BoundaryPoint *bp) {
+    for (int i = 0; i < bpVec.size(); ++i) {
+            if (bpVec.at(i) == bp) {
+                bpVec.erase(bpVec.begin() + i);
+                return;
+            }
+        }
+}
+
+void CrowdPatch::removeLeftEntry(BoundaryPoint* bp) {
+    for (int i = 0; i < this->leftEntries.size(); ++i) {
+        if (this->leftEntries.at(i) == bp) {
+            leftEntries.erase(leftEntries.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeRightEntry(BoundaryPoint* bp) {
+    for (int i = 0; i < this->rightEntries.size(); ++i) {
+        if (this->rightEntries.at(i) == bp) {
+            rightEntries.erase(rightEntries.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeUpEntry(BoundaryPoint* bp) {
+    for (int i = 0; i < this->upEntries.size(); ++i) {
+        if (this->upEntries.at(i) == bp) {
+            upEntries.erase(upEntries.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeDownEntry(BoundaryPoint* bp) {
+    for (int i = 0; i < this->downEntries.size(); ++i) {
+        if (this->downEntries.at(i) == bp) {
+            downEntries.erase(downEntries.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeLeftExit(BoundaryPoint* bp) {
+    for (int i = 0; i < this->leftExits.size(); ++i) {
+        if (this->leftExits.at(i) == bp) {
+            leftExits.erase(leftExits.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeRightExit(BoundaryPoint* bp) {
+    for (int i = 0; i < this->rightExits.size(); ++i) {
+        if (this->rightExits.at(i) == bp) {
+            rightExits.erase(rightExits.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeUpExit(BoundaryPoint* bp) {
+    for (int i = 0; i < this->upExits.size(); ++i) {
+        if (this->upExits.at(i) == bp) {
+            upExits.erase(upExits.begin() + i);
+            return;
+        }
+    }
+}
+
+void CrowdPatch::removeDownExit(BoundaryPoint* bp) {
+    for (int i = 0; i < this->downExits.size(); ++i) {
+        if (this->downExits.at(i) == bp) {
+            downExits.erase(downExits.begin() + i);
+            return;
+        }
+    }
 }
 
 

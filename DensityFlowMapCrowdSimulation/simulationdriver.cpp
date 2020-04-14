@@ -1,11 +1,11 @@
 #include "simulationdriver.h"
-
+using namespace std;
 // Constructor
 SimulationDriver::SimulationDriver()
 {
     testPatch = CrowdPatch(glm::vec2(0.0, 0.0), 50.0, PERIOD, 1.0, glm::vec2(1.0, 1.0));
     this->graph = PatchGraph();
-    graph.tempFill();
+//    graph.tempFill();
 
 }
 
@@ -49,28 +49,38 @@ void SimulationDriver::followTrajectories(std::vector<Trajectory> trajectories,
         glm::vec3 cpFirst = T.getControlPointAtIndex(0);
         glm::vec3 cpLast = T.getControlPointAtIndex(numControlPoints - 1);
 
-        if (subFrame < cpFirst[2] || subFrame >= cpLast[2]) {
-            // If frame is outside trajectory time bounds, skip
-            continue;
-        }
-
         // Bezier interpolation
-        this->smoothTrajectory(T, numControlPoints, subFrame, currFrame, fs, count);
-        count++;
+        if (this->smoothTrajectory(T, numControlPoints, subFrame, currFrame, fs, count)) {
+            count++;
+        }
     }
 }
 
-void SimulationDriver::smoothTrajectory(Trajectory T,
+bool SimulationDriver::smoothTrajectory(Trajectory T,
                                         int numControlPoints, int subFrame,
                                         int currFrame,
                                         std::ofstream &fs, int count) {
+    bool drawSomething = false;
     for (int seg = 0; seg < numControlPoints - 1; ++seg) {
+//        cout << "Segment #" << seg << "============================" << endl;
         // Check if current frame is within this segment otherwiese continue
         glm::vec3 cp1 = T.getControlPointAtIndex(seg);
         glm::vec3 cp2 = T.getControlPointAtIndex(seg + 1);
-        if (subFrame < cp1[2] || subFrame >= cp2[2]) {
-            continue;
+        if (cp1[2] > cp2[2]) {
+            if (currFrame <= cp1[2] && currFrame >= cp2[2]) {
+                continue;
+            }
+            if (currFrame < cp2[2]) {
+                subFrame += PERIOD;
+            }
+
+            cp2[2] += PERIOD;
+        } else {
+            if (subFrame < cp1[2] || subFrame >= cp2[2]) {
+                continue;
+            }
         }
+
         glm::vec3 cp0 = glm::vec3();
         glm::vec3 cp3 = glm::vec3();
 
@@ -107,23 +117,42 @@ void SimulationDriver::smoothTrajectory(Trajectory T,
         glm::vec3 p = mix(b02, b12, interpRatio);
 
         fs << count << ":";
+//        cout << "Wrote to file count " << count << endl;
+        if (std::isnan(p[0])) {
+            p[0] = 0.0;
+        }
+        if (std::isnan(p[1])) {
+            p[1] = 0.0;
+        }
         fs << " " << p[0] << " " << 0 << " " << p[1] << "\n";
         display.setPixelColor(QPoint(p[0], p[1]), QColor(currFrame, currFrame, currFrame));
+        drawSomething = true;
+        return drawSomething;
     }
+    return drawSomething;
 }
 
 
 
 // Run simulation
 void SimulationDriver::run(const int frameCount) {
-    display = QImage(400, 400, QImage::Format_RGB32);
+    display = QImage(512, 512, QImage::Format_RGB32);
     display.fill(Qt::red);
     std::srand(std::time(nullptr));
+
+    QString filenameDensity = "../../../../Maps/PinkDensityMap.jpg";
+    QString filenameFlow = "../../../../Maps/PinkDensityMap.jpg";
+
+    QImage densityMap = QImage(filenameDensity);
+    QImage flowMap = QImage(filenameFlow);
+    QColor color = densityMap.pixel(400, 500);
+    graph.fillWithMaps(densityMap, flowMap);
+
 
 
     int framesPerPeriod = (int) PERIOD;
 
-    int numPeriods = std::floor((float) frameCount / (float) framesPerPeriod);
+//    int numPeriods = std::floor((float) frameCount / (float) framesPerPeriod);
 
 
     // Initialize patches and graph
@@ -137,43 +166,73 @@ void SimulationDriver::run(const int frameCount) {
     // 1. Calculate error of graph
     error = this->graph.calculateError();
 
-    while (error > EPSILON && attemptCount < 2) {
+    while (error > EPSILON && attemptCount < 5) {
 
         // 2. Find minima and maxima of error
         std::vector<CrowdPatch*> minima = this->graph.findMinima();
         std::vector<CrowdPatch*> maxima = this->graph.findMaxima();
-
-        // 3a. Split minima into groups
         int groupSize = 3;
-        for (int i = 0; i < floor(minima.size() / float(groupSize)); i += groupSize) {
-            std::vector<CrowdPatch*> currGroup =  std::vector<CrowdPatch*>();
-            currGroup.push_back(minima.at(i));
-            currGroup.push_back(minima.at(i + 1));
-            currGroup.push_back(minima.at(i + 2));
+
+        // if not enough minima to make group, add points
+        if (minima.size() < groupSize) {
+            for (int dummy = 0; dummy < 5; ++dummy) {
+                int randIndexX = floor(XDIM * static_cast <float> (std::rand()) / (static_cast <float> (RAND_MAX)));
+                int randIndexY = floor(YDIM * static_cast <float> (std::rand()) / (static_cast <float> (RAND_MAX)));
+                CrowdPatch* currPatch = graph.getPatchAt(randIndexX, randIndexY);
+                if (currPatch != nullptr) {
+                    minima.push_back(currPatch);
+                }
+            }
+        }
+
+//         3a. Split minima into groups
+//        for (int i = 0; i < floor(minima.size() / float(groupSize)); i += groupSize) {
+        for (int i = 0; i < minima.size() - groupSize + 1; i += groupSize) {
+            std::vector<CrowdPatch*> currGroupFront =  std::vector<CrowdPatch*>();
+            for (int s = 0; s < groupSize; ++s) {
+                if (i + s < minima.size()) {
+                    currGroupFront.push_back(minima.at(i + s));
+                }
+            }
 
             // 4a. Find shortest paths between group of minima
-            std::vector<CrowdPatch*> currPath = this->graph.getOptimaMinCostPath(currGroup);
+            std::vector<CrowdPatch*> currPathFront = this->graph.getOptimaMinCostPath(currGroupFront);
 
             // 5a. Add boundary points along shortest path
-            graph.addBPsAlongPath(currPath);
+            graph.addBPsAlongPath(currPathFront);
+
         }
 
-        // 3b. Split minima into groups
-        for (int i = 0; i < floor(maxima.size() / float(groupSize)); i += groupSize) {
-            std::vector<CrowdPatch*> currGroup =  std::vector<CrowdPatch*>();
-            currGroup.push_back(maxima.at(i));
-            currGroup.push_back(maxima.at(i + 1));
-            currGroup.push_back(maxima.at(i + 2));
 
-            // 4b. Find shortest paths between group of minima
+        // 3b. Split maxima into groups
+        for (int i = 0; i < maxima.size() - groupSize + 1; i += groupSize) {
+            std::vector<CrowdPatch*> currGroup =  std::vector<CrowdPatch*>();
+            for (int s = 0; s < groupSize; ++s) {
+                if (i + s < maxima.size()) {
+                    currGroup.push_back(maxima.at(i + s));
+                }
+            }
+
+            // 4b. Find shortest paths between group of maxima
             std::vector<CrowdPatch*> currPath = this->graph.getOptimaMinCostPath(currGroup);
+            if (currPath.size() > 1) {
+                if (currPath.at(0) != currPath.at(currPath.size() - 1)) {
+                    std::cout << "non cyclic path!!!" << std::endl;
+                    continue;
+                }
+            }
 
             // 5b. Remove boundary points along shortest path
+            graph.removeBPsAlongPath(currPath);
+
         }
+        // Create temporary matching for error calculation
         for (int i = 0; i < XDIM; ++i) {
             for (int j = 0; j < YDIM; ++j) {
                 CrowdPatch* currPatch = graph.getPatchAt(i, j);
-                currPatch->matchBoundaryPoints();
+                if (currPatch != nullptr) {
+                    currPatch->matchBoundaryPoints();
+                }
             }
         }
 
@@ -185,64 +244,50 @@ void SimulationDriver::run(const int frameCount) {
         attemptCount++;
     }
 
-
+    // All patches now have completed boundary points
+    // iterate over all patches
     for (int i = 0; i < XDIM; ++i) {
         for (int j = 0; j < YDIM; ++j) {
             CrowdPatch* currPatch = graph.getPatchAt(i, j);
+            if (currPatch == nullptr) {
+                continue;
+            }
 
-
-//            float ox = currPatch->getOrigin()[0];
-//            float oy = currPatch->getOrigin()[1];
-//            float w = currPatch->getWidth();
-
-//            BoundaryPoint bp1 = BoundaryPoint(glm::vec3(ox, oy + 3.0 * w / 4.0, 0.0), ENTRY, currPatch);
-//            BoundaryPoint bp2 = BoundaryPoint(glm::vec3(ox, oy + w / 4.0, 50.0), ENTRY, currPatch);
-
-//            BoundaryPoint bp3 = BoundaryPoint(glm::vec3(ox + w, oy + w / 2.0, 200.0), EXIT, currPatch);
-//            BoundaryPoint bp4 = BoundaryPoint(glm::vec3(ox + w/2.0, oy + w, 250.0), EXIT, currPatch);
-
-//            currPatch->addEntry(&bp1);
-//            currPatch->addEntry(&bp2);
-
-//            currPatch->addExit(&bp3);
-//            currPatch->addExit(&bp4);
-
+            // Match the boundary points to obtain trajectories
             currPatch->matchBoundaryPoints();
 //            insertTestTrajectories(*currPatch);
-            std::cout << currPatch->getTrajectories().size() << std::endl;
+//            Trajectory t = Trajectory();
+//            t.insertControlPoint(glm::vec3(currPatch->getOrigin()[0], currPatch->getOrigin()[1], 0), 0);
+//            t.insertControlPoint(glm::vec3(currPatch->getOrigin()[0] + currPatch->getWidth(),
+//                                 currPatch->getOrigin()[1] + currPatch->getWidth(),
+//                    currPatch->getPeriod()), 1);
+//            t.setParent(currPatch);
+//            currPatch->addTrajectory(t);
 
 
-//            currPatch->removeCollisions();
+            // split trajectories so none overlap period
             for (int p = 0; p < (int) currPatch->getTrajectories().size(); ++p) {
-                currPatch->getTrajectoryAt(p)->addBump();
-                currPatch->getTrajectoryAt(p)->straighten(1);
+//                currPatch->getTrajectoryAt(p)->addBump();
+                currPatch->getTrajectoryAt(p)->split();
+            }
+
+            // Remove collisions
+//            currPatch->removeCollisions();
+
+            // Add intermediate points to straighten splines
+            for (int p = 0; p < (int) currPatch->getTrajectories().size(); ++p) {
+//                currPatch->getTrajectoryAt(p)->addBump();
+//                currPatch->getTrajectoryAt(p)->straighten(1);
             }
         }
     }
-
-//    BoundaryPoint bp1 = BoundaryPoint(glm::vec3(ox, oy + 3.0 * w / 4.0, 0.0), ENTRY, currPatch);
-//    BoundaryPoint bp2 = BoundaryPoint(glm::vec3(ox, oy + w / 4.0, 50.0), ENTRY, currPatch);
-
-//    BoundaryPoint bp3 = BoundaryPoint(glm::vec3(ox + w, oy + w / 2.0, 200.0), EXIT, currPatch);
-//    BoundaryPoint bp4 = BoundaryPoint(glm::vec3(ox + w/2.0, oy + w, 250.0), EXIT, currPatch);
-//    testPatch.addEntry(&bp1);
-//    testPatch.addEntry(&bp2);
-
-//    testPatch.addExit(&bp3);
-//    testPatch.addExit(&bp4);
-
-//    testPatch.matchBoundaryPoints();
-
-
-
-    // Temporary test trajectories:
-//    insertTestTrajectories(testPatch);
 
     /*
      * At this point, each crowd patch will contain trajectories from input to output points
      * Perform collision avoidance on these trajectories within each patch
      */
 
+//    insertTestTrajectories(testPatch);
     // Remove collisions
 //    testPatch.removeCollisions();
 
@@ -252,10 +297,10 @@ void SimulationDriver::run(const int frameCount) {
 //    }
 
     // Animate characters along the trajectories
-    for (int p = 0; p < numPeriods; ++p) {
+//    for (int p = 0; p < numPeriods; ++p) {
         // Interpolate and render points
         for (int j = 0; j < framesPerPeriod; ++j) {
-            int currFrame = framesPerPeriod * p + j;
+            int currFrame = /*framesPerPeriod * p +*/ j;
             std::string filename = "../../../../HoudiniProjects/Eleventh/geo/" + std::to_string(currFrame) + ".poly";
             std::ofstream fs;
             fs.open(filename);
@@ -264,6 +309,9 @@ void SimulationDriver::run(const int frameCount) {
             for (int x = 0; x < XDIM; ++x) {
                 for (int y = 0; y < YDIM; ++y) {
                     CrowdPatch* currPatch = graph.getPatchAt(x, y);
+                    if (currPatch == nullptr) {
+                        continue;
+                    }
                     this->followTrajectories(currPatch->getTrajectories(), j, currFrame, fs, count);
                 }
             }
@@ -274,6 +322,6 @@ void SimulationDriver::run(const int frameCount) {
             fs.close();
 
         }
-    }
+//    }
 }
 

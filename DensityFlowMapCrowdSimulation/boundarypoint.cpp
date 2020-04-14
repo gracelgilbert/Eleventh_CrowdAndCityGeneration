@@ -90,6 +90,10 @@ void BoundaryPoint::setStatus(STATUS newStatus) {
     this->status = newStatus;
 }
 
+void BoundaryPoint::setDone(bool done) {
+    this->done = done;
+}
+
 bool BoundaryPoint::setCurrentMatch(BoundaryPoint *newMatch) {
     if (newMatch == nullptr) {
         this->currentMatch = nullptr;
@@ -158,7 +162,7 @@ float BoundaryPoint::findPenalty(BoundaryPoint *bp) {
 
         if (isOn(bp, xmin, 0)) {
             // if bp is on xmin
-            return 4.0;
+            return 8.0;
         }
 
         if (isOn(bp, ymin, 1) || isOn(bp, ymax, 1)) {
@@ -176,7 +180,7 @@ float BoundaryPoint::findPenalty(BoundaryPoint *bp) {
 
         if (isOn(bp, xmax, 0)) {
             // if bp is also on xmax
-            return 4.0;
+            return 8.0;
         }
 
         if (isOn(bp, ymin, 1) || isOn(bp, ymax, 1)) {
@@ -193,7 +197,7 @@ float BoundaryPoint::findPenalty(BoundaryPoint *bp) {
 
         if (isOn(bp, ymin, 1)) {
             // if bp is also on ymin
-            return 4.0;
+            return 8.0;
         }
 
         if (isOn(bp, xmin, 0) || isOn(bp, xmax, 0)) {
@@ -211,7 +215,7 @@ float BoundaryPoint::findPenalty(BoundaryPoint *bp) {
 
         if (isOn(bp, ymax, 1)) {
             // if bp is also on ymax
-            return 4.0;
+            return 8.0;
         }
 
         if (isOn(bp, xmin, 0) || isOn(bp, xmax, 0)) {
@@ -244,6 +248,8 @@ float BoundaryPoint::calculateRating(BoundaryPoint* bp) {
 
     float p = this->findPenalty(bp);
 
+    p += tempT.getSpeed() / 6.0;
+
     return uMatch + p;
 }
 
@@ -261,8 +267,15 @@ void BoundaryPoint::fillRatingsMap() {
     }
 }
 
+void BoundaryPoint::resetCounter() {
+    this->counter = 0;
+}
+
 bool BoundaryPoint::createTrajectory(Trajectory& T) {
     if (this->type == ENTRY) {
+        if (this->currentMatch == nullptr) {
+            return false;
+        }
         T.insertControlPoint(this->position, 0);
         T.insertControlPoint(this->currentMatch->position, 1);
         this->setTrajectory(&T);

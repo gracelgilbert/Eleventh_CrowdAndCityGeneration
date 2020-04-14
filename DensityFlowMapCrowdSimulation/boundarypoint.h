@@ -83,6 +83,7 @@ public:
     void setNeighbor(BoundaryPoint* n);
     void setParent(CrowdPatch* p);
     void setTrajectory(Trajectory* t);
+    void setDone(bool done);
 
     void setStatus(STATUS newStatus);
     bool setCurrentMatch(BoundaryPoint* newMatch);
@@ -91,6 +92,7 @@ public:
     void insertBoundaryPoint(BoundaryPoint* bp);
     void sortPreferenceList();
     void incrementCounter();
+    void resetCounter();
 
     // Operations
     float findPenalty(BoundaryPoint* bp);

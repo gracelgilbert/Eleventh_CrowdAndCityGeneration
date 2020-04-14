@@ -68,6 +68,16 @@ private:
     CrowdPatch* up;
     CrowdPatch* down;
 
+    std::vector<BoundaryPoint*> leftEntries;
+    std::vector<BoundaryPoint*> rightEntries;
+    std::vector<BoundaryPoint*> upEntries;
+    std::vector<BoundaryPoint*> downEntries;
+
+    std::vector<BoundaryPoint*> leftExits;
+    std::vector<BoundaryPoint*> rightExits;
+    std::vector<BoundaryPoint*> upExits;
+    std::vector<BoundaryPoint*> downExits;
+
     CrowdPatch* parent;
 
 public:
@@ -116,6 +126,9 @@ public:
     void addEntry(BoundaryPoint* bp);
     void addExit(BoundaryPoint* bp);
 
+    void removeEntry(BoundaryPoint* bp);
+    void removeExit(BoundaryPoint* bp);
+
     bool isInS(int index);
     bool isInD(int index);
 
@@ -152,9 +165,48 @@ public:
 
     void clearVecs();
 
+    std::vector<BoundaryPoint*> getLeftEntries();
+    std::vector<BoundaryPoint*> getRightEntries();
+    std::vector<BoundaryPoint*> getUpEntries();
+    std::vector<BoundaryPoint*> getDownEntries();
+
+    std::vector<BoundaryPoint*> getLeftExits();
+    std::vector<BoundaryPoint*> getRightExits();
+    std::vector<BoundaryPoint*> getUpExits();
+    std::vector<BoundaryPoint*> getDownExits();
+
+
+
+
+
+    void addLeftEntry(BoundaryPoint* bp);
+
+    void addRightEntry(BoundaryPoint* bp);
+
+    void addUpEntry(BoundaryPoint* bp);
+
+    void addDownEntry(BoundaryPoint* bp);
+
+    void addLeftExit(BoundaryPoint* bp);
+
+    void addRightExit(BoundaryPoint* bp);
+
+    void addUpExit(BoundaryPoint* bp);
+
+    void addDownExit(BoundaryPoint* bp);
+
+    void removeFromVector(std::vector<BoundaryPoint*> bpVec, BoundaryPoint* bp);
+
+    void removeLeftEntry(BoundaryPoint* bp);
+    void removeRightEntry(BoundaryPoint* bp);
+    void removeUpEntry(BoundaryPoint* bp);
+    void removeDownEntry(BoundaryPoint* bp);
+
+    void removeLeftExit(BoundaryPoint* bp);
+    void removeRightExit(BoundaryPoint* bp);
+    void removeUpExit(BoundaryPoint* bp);
+    void removeDownExit(BoundaryPoint* bp);
+
 };
-
-
-
 
 #endif // CROWDPATCH_H

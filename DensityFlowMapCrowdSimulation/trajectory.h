@@ -46,6 +46,7 @@ public:
     // Operations
     void straighten(int amt);
     void addBump();
+    void split();
 
 };
 

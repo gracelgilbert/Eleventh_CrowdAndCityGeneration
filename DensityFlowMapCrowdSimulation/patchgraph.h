@@ -7,8 +7,8 @@
 #include "math.h"
 #include <time.h>
 
-#define XDIM 2
-#define YDIM 2
+#define XDIM 30
+#define YDIM 30
 
 class PatchGraph {
 
@@ -24,6 +24,8 @@ private:
 
 public:
     void tempFill();
+
+    void fillWithMaps(QImage densityMap, QImage flowMap);
 
 
     // Constructors
@@ -55,7 +57,10 @@ public:
 
     void addBPsAlongPath(std::vector<CrowdPatch*> path);
 
+    bool isValidRemovalPath(std::vector<CrowdPatch*> path);
+
     void removeBPsAlongPath(std::vector<CrowdPatch*> path);
+
 
 
 
