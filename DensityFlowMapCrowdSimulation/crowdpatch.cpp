@@ -14,12 +14,20 @@ CrowdPatch::CrowdPatch() :
     error(1.0),
     entryBPs(std::vector<BoundaryPoint*>()),
     exitBPs(std::vector<BoundaryPoint*>()),
-    trajectories(std::vector<Trajectory>()),
+    trajectories(std::vector<Trajectory*>()),
     parent(nullptr),
     left(nullptr),
     right(nullptr),
     up(nullptr),
-    down(nullptr)
+    down(nullptr),
+    leftEntryCount(0),
+    rightEntryCount(0),
+    upEntryCount(0),
+    downEntryCount(0),
+    leftExitCount(0),
+    rightExitCount(0),
+    upExitCount(0),
+    downExitCount(0)
 { }
 
 CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
@@ -36,12 +44,20 @@ CrowdPatch::CrowdPatch(glm::vec2 origin, float width, float period,
     error(1.0),
     entryBPs(std::vector<BoundaryPoint*>()),
     exitBPs(std::vector<BoundaryPoint*>()),
-    trajectories(std::vector<Trajectory>()),
+    trajectories(std::vector<Trajectory*>()),
     parent(nullptr),
     left(nullptr),
     right(nullptr),
     up(nullptr),
-    down(nullptr)
+    down(nullptr),
+    leftEntryCount(0),
+    rightEntryCount(0),
+    upEntryCount(0),
+    downEntryCount(0),
+    leftExitCount(0),
+    rightExitCount(0),
+    upExitCount(0),
+    downExitCount(0)
 { }
 
 // Destructor
@@ -111,13 +127,51 @@ std::vector<BoundaryPoint*> CrowdPatch::getExitBPs() {
     return this->exitBPs;
 }
 
-std::vector<Trajectory> CrowdPatch::getTrajectories() {
+std::vector<Trajectory*> CrowdPatch::getTrajectories() {
     return this->trajectories;
 }
 
 Trajectory* CrowdPatch::getTrajectoryAt(int index) {
-    return &this->trajectories.at(index);
+    return this->trajectories.at(index);
 }
+
+int CrowdPatch::getLeftEntryCount() {
+    return this->leftEntryCount;
+}
+
+int CrowdPatch::getRightEntryCount() {
+    return this->rightEntryCount;
+}
+
+
+int CrowdPatch::getUpEntryCount() {
+    return this->upEntryCount;
+}
+
+
+int CrowdPatch::getDownEntryCount() {
+    return this->downEntryCount;
+}
+
+
+int CrowdPatch::getLeftExitCount() {
+    return this->leftExitCount;
+}
+
+int CrowdPatch::getRightExitCount() {
+    return this->rightExitCount;
+}
+
+
+int CrowdPatch::getUpExitCount() {
+    return this->upExitCount;
+}
+
+
+int CrowdPatch::getDownExitCount() {
+    return this->downExitCount;
+}
+
 
 // Setters
 
@@ -140,6 +194,43 @@ void CrowdPatch::setDistance(float distance) {
 void CrowdPatch::setParent(CrowdPatch *p) {
     this->parent = p;
 }
+
+
+void CrowdPatch::setLeftEntryCount(int num) {
+    this->leftEntryCount = num;
+}
+
+void CrowdPatch::setRightEntryCount(int num) {
+    this->rightEntryCount = num;
+}
+
+void CrowdPatch::setUpEntryCount(int num) {
+    this->upEntryCount = num;
+}
+
+void CrowdPatch::setDownEntryCount(int num) {
+    this->downEntryCount = num;
+}
+
+
+
+void CrowdPatch::setLeftExitCount(int num) {
+    this->leftExitCount = num;
+}
+
+void CrowdPatch::setRightExitCount(int num) {
+    this->rightExitCount = num;
+}
+
+void CrowdPatch::setUpExitCount(int num) {
+    this->upExitCount = num;
+}
+
+void CrowdPatch::setDownExitCount(int num) {
+    this->downExitCount = num;
+}
+
+
 
 // Modifiers
 
@@ -178,6 +269,7 @@ void CrowdPatch::removeEntry(BoundaryPoint *bp) {
             return;
         }
     }
+    std::cout << "no for entry" << std::endl;
 }
 
 void CrowdPatch::removeExit(BoundaryPoint *bp) {
@@ -187,6 +279,8 @@ void CrowdPatch::removeExit(BoundaryPoint *bp) {
             return;
         }
     }
+    std::cout << "no for exit" << std::endl;
+
 }
 
 void CrowdPatch::addEntry(BoundaryPoint *bp) {
@@ -219,7 +313,7 @@ bool CrowdPatch::isInD(int index) {
     return false;
 }
 
-void CrowdPatch::addTrajectory(Trajectory T) {
+void CrowdPatch::addTrajectory(Trajectory* T) {
     this->trajectories.push_back(T);
 }
 
@@ -227,6 +321,19 @@ void CrowdPatch::reset() {
     this->visited = false;
     this->distance = FLT_MAX;
     this->parent = nullptr;
+}
+
+void CrowdPatch::resetBPCounts() {
+    this->leftEntryCount = this->leftEntries.size();
+    this->rightEntryCount = this->rightEntries.size();
+    this->upEntryCount = this->upEntries.size();
+    this->downEntryCount = this->downEntries.size();
+
+    this->leftExitCount = this->leftExits.size();
+    this->rightExitCount = this->rightExits.size();
+    this->upExitCount = this->upExits.size();
+    this->downExitCount = this->downExits.size();
+
 }
 
 // Operations
@@ -263,8 +370,8 @@ void CrowdPatch::removeCollisions() {
 //                        M[arrayIndex] = 0;
                     } else {
                         // Get the two trajectories
-                        Trajectory T1 = this->trajectories.at(x);
-                        Trajectory T2 = this->trajectories.at(y);
+                        Trajectory T1 = *(this->trajectories.at(x));
+                        Trajectory T2 = *(this->trajectories.at(y));
                         // Set up variables to get out of trajectory pair
                         glm::vec3 cpx; // position of collision
                         glm::vec3 cpy;
@@ -291,8 +398,8 @@ void CrowdPatch::removeCollisions() {
 
             if (minOverallDist < minAllowedDistance) {
                 glm::vec3 dPxy = glm::normalize(minCPx - minCPy);
-                Trajectory xTraj = this->trajectories.at(minx);
-                Trajectory yTraj = this->trajectories.at(miny);
+                Trajectory xTraj = *(this->trajectories.at(minx));
+                Trajectory yTraj = *(this->trajectories.at(miny));
 
                 float alpha = std::min(minAllowedDistance * 2.0, 2.0);
 
@@ -320,8 +427,8 @@ void CrowdPatch::removeCollisions() {
                 pyNew[2] = timey;
 
 
-                this->trajectories.at(minx).insertControlPoint(pxNew, minSegFirstx + 1);
-                this->trajectories.at(miny).insertControlPoint(pyNew, minSegFirsty + 1);
+                this->trajectories.at(minx)->insertControlPoint(pxNew, minSegFirstx + 1);
+                this->trajectories.at(miny)->insertControlPoint(pyNew, minSegFirsty + 1);
             }
             counter++;
         }
@@ -495,10 +602,12 @@ bool CrowdPatch::minDist(Trajectory T1, Trajectory T2,
 
 void CrowdPatch::matchBoundaryPoints() {
     for (BoundaryPoint* bp : entryBPs) {
+        bp->setCurrentMatch(nullptr);
         bp->fillRatingsMap();
         bp->sortPreferenceList();
     }
     for (BoundaryPoint* bp : exitBPs) {
+        bp->setCurrentMatch(nullptr);
         bp->fillRatingsMap();
         bp->sortPreferenceList();
     }
@@ -539,7 +648,9 @@ void CrowdPatch::matchBoundaryPoints() {
                             o->setCurrentMatch(i);
                             o->setStatus(MATCHED);
 
-                            iPrime->setCurrentMatch(nullptr);
+                            if (!iPrime->setCurrentMatch(nullptr)) {
+                                std::cout << "ji" << std::endl;
+                            }
                             iPrime->setStatus(UNMATCHED);
                         }
                     }
@@ -549,12 +660,20 @@ void CrowdPatch::matchBoundaryPoints() {
     }
 
     for (BoundaryPoint* bp : entryBPs) {
-        Trajectory T = Trajectory();
-        if (bp->createTrajectory(T)) {
-            T.setParent(this);
+//        Trajectory* T = new Trajectory();
+        Trajectory* T = bp->createTrajectory();
+        if (T != nullptr) {
+            T->setParent(this);
+//            T->setEntryPoint(bp);
+//            T->setExitPoint(bp->getCurrentMatch());
             this->trajectories.push_back(T);
         }
     }
+//    for (BoundaryPoint* bp : exitBPs) {
+//        if (bp->getTrajectory() == nullptr) {
+//            int hdaosdf = 1;
+//        }
+//    }
 }
 
 float CrowdPatch::calculateDensity() {
@@ -565,10 +684,13 @@ float CrowdPatch::calculateDensity() {
     float dt = 1.0;
     for (int t = 0; t < this->period; t += dt) {
         float tDensity = 0.f;
-        for (Trajectory T : this->trajectories) {
-            int numControlPoints = T.getNumControlPoints();
-            if (t > T.getTimeAtIndex(0) && t < T.getTimeAtIndex(numControlPoints - 1)) {
-                tDensity++;
+        for (int i = 0; i < this->trajectories.size(); ++i) {
+            Trajectory* T = this->trajectories.at(i);
+            if (T != nullptr) {
+                int numControlPoints = T->getNumControlPoints();
+                if (t > T->getTimeAtIndex(0) && t < T->getTimeAtIndex(numControlPoints - 1)) {
+                    tDensity++;
+                }
             }
         }
         density += tDensity * dt;
@@ -581,10 +703,14 @@ glm::vec2 CrowdPatch::calculateFlow() {
         return glm::vec2(0.0);
     }
     glm::vec2 flow = glm::vec2(0.f);
-    for (Trajectory T : this->trajectories) {
-        glm::vec2 di = T.getDirection();
-        float ti = T.getDuration();
-        flow += ti * di;
+    for (int i = 0; i < this->trajectories.size(); ++i) {
+        Trajectory* T = this->trajectories.at(i);
+        if (T != nullptr) {
+
+            glm::vec2 di = T->getDirection();
+            float ti = T->getDuration();
+            flow += ti * di;
+        }
     }
     return glm::normalize(flow);
 }
@@ -747,6 +873,8 @@ void CrowdPatch::removeLeftEntry(BoundaryPoint* bp) {
             return;
         }
     }
+    std::cout << "no for left entry" << std::endl;
+
 }
 
 void CrowdPatch::removeRightEntry(BoundaryPoint* bp) {
@@ -756,6 +884,8 @@ void CrowdPatch::removeRightEntry(BoundaryPoint* bp) {
             return;
         }
     }
+    std::cout << "no for right entry" << std::endl;
+
 }
 
 void CrowdPatch::removeUpEntry(BoundaryPoint* bp) {
@@ -765,6 +895,8 @@ void CrowdPatch::removeUpEntry(BoundaryPoint* bp) {
             return;
         }
     }
+    std::cout << "no for up entry" << std::endl;
+
 }
 
 void CrowdPatch::removeDownEntry(BoundaryPoint* bp) {
@@ -774,6 +906,9 @@ void CrowdPatch::removeDownEntry(BoundaryPoint* bp) {
             return;
         }
     }
+
+    std::cout << "no for down" << std::endl;
+
 }
 
 void CrowdPatch::removeLeftExit(BoundaryPoint* bp) {
@@ -783,6 +918,9 @@ void CrowdPatch::removeLeftExit(BoundaryPoint* bp) {
             return;
         }
     }
+
+    std::cout << "no for left exit" << std::endl;
+
 }
 
 void CrowdPatch::removeRightExit(BoundaryPoint* bp) {
@@ -792,6 +930,9 @@ void CrowdPatch::removeRightExit(BoundaryPoint* bp) {
             return;
         }
     }
+
+    std::cout << "no for right exit" << std::endl;
+
 }
 
 void CrowdPatch::removeUpExit(BoundaryPoint* bp) {
@@ -801,6 +942,8 @@ void CrowdPatch::removeUpExit(BoundaryPoint* bp) {
             return;
         }
     }
+    std::cout << "no for up exit" << std::endl;
+
 }
 
 void CrowdPatch::removeDownExit(BoundaryPoint* bp) {
@@ -810,6 +953,8 @@ void CrowdPatch::removeDownExit(BoundaryPoint* bp) {
             return;
         }
     }
+    std::cout << "no for down exit" << std::endl;
+
 }
 
 

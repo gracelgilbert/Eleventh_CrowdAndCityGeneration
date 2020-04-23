@@ -60,7 +60,7 @@ private:
     std::vector<BoundaryPoint*> exitBPs;
 
     // Trajectories
-    std::vector<Trajectory> trajectories;
+    std::vector<Trajectory*> trajectories;
 
     // Neighbors
     CrowdPatch* left;
@@ -77,6 +77,16 @@ private:
     std::vector<BoundaryPoint*> rightExits;
     std::vector<BoundaryPoint*> upExits;
     std::vector<BoundaryPoint*> downExits;
+
+    int leftEntryCount;
+    int rightEntryCount;
+    int upEntryCount;
+    int downEntryCount;
+
+    int leftExitCount;
+    int rightExitCount;
+    int upExitCount;
+    int downExitCount;
 
     CrowdPatch* parent;
 
@@ -106,8 +116,18 @@ public:
     std::vector<BoundaryPoint*> getEntryBPs();
     std::vector<BoundaryPoint*> getExitBPs();
 
-    std::vector<Trajectory> getTrajectories();
+    std::vector<Trajectory*> getTrajectories();
     Trajectory* getTrajectoryAt(int index);
+
+    int getLeftEntryCount();
+    int getRightEntryCount();
+    int getUpEntryCount();
+    int getDownEntryCount();
+
+    int getLeftExitCount();
+    int getRightExitCount();
+    int getUpExitCount();
+    int getDownExitCount();
 
     // Setters
     void setDesiredDensity(float d);
@@ -115,6 +135,17 @@ public:
     void setVistState(bool state);
     void setDistance(float distance);
     void setParent(CrowdPatch* p);
+
+    void setLeftEntryCount(int num);
+    void setRightEntryCount(int num);
+    void setUpEntryCount(int num);
+    void setDownEntryCount(int num);
+
+    void setLeftExitCount(int num);
+    void setRightExitCount(int num);
+    void setUpExitCount(int num);
+    void setDownExitCount(int num);
+
 
     // Modifiers
     void addIndexS(int index);
@@ -132,7 +163,7 @@ public:
     bool isInS(int index);
     bool isInD(int index);
 
-    void addTrajectory(Trajectory T);
+    void addTrajectory(Trajectory* T);
 
     void reset();
 
@@ -175,6 +206,7 @@ public:
     std::vector<BoundaryPoint*> getUpExits();
     std::vector<BoundaryPoint*> getDownExits();
 
+    void resetBPCounts();
 
 
 

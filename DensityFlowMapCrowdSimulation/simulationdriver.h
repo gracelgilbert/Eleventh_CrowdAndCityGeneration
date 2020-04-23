@@ -7,8 +7,8 @@
 #include "crowdpatch.h"
 #include "patchgraph.h"
 
-#define PERIOD 255.0
-#define EPSILON 0.1
+#define PERIOD 120
+#define EPSILON 0.5
 
 class SimulationDriver {
 /*
@@ -25,13 +25,13 @@ private:
     bool minDist(Trajectory T1, Trajectory T2, glm::vec3 &cp1, glm::vec3 &cp2,
                   int &segFirst1, int &segFirst2, float &dist);
 
-    // Animate characters along interpolated patch trajectories
-    void followTrajectories(std::vector<Trajectory> trajectories,
+    // Animate characters along interpolated patch trajectory
+    bool followTrajectory(Trajectory* T,
                             int subFrame, int currframe,
-                            std::ofstream &fs, int &count);
+                            std::ofstream &fs, int &count, glm::vec4& outputPoint);
     bool smoothTrajectory(Trajectory T, int numControlPoints,
                           int subFrame, int currFrame,
-                          std::ofstream &fs, int count);
+                          std::ofstream &fs, int count, glm::vec4& outputPoint);
 
 public:
     // Constructor

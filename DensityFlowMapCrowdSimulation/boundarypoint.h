@@ -98,8 +98,10 @@ public:
     float findPenalty(BoundaryPoint* bp);
     float calculateRating(BoundaryPoint* bp);
     void fillRatingsMap();
-    bool createTrajectory(Trajectory& T);
+//    bool createTrajectory(Trajectory& T);
+    Trajectory* createTrajectory();
     BoundaryPoint* getNextProposal();
+    void clear();
 
 };
 

@@ -7,8 +7,8 @@
 #include "math.h"
 #include <time.h>
 
-#define XDIM 30
-#define YDIM 30
+#define XDIM 90
+#define YDIM 90
 
 class PatchGraph {
 

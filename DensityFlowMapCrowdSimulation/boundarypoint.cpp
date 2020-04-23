@@ -248,7 +248,7 @@ float BoundaryPoint::calculateRating(BoundaryPoint* bp) {
 
     float p = this->findPenalty(bp);
 
-    p += tempT.getSpeed() / 6.0;
+    p += tempT.getSpeed() / 2.0;
 
     return uMatch + p;
 }
@@ -271,18 +271,45 @@ void BoundaryPoint::resetCounter() {
     this->counter = 0;
 }
 
-bool BoundaryPoint::createTrajectory(Trajectory& T) {
+//bool BoundaryPoint::createTrajectory(Trajectory *T) {
+//    if (this->type == ENTRY) {
+//        if (this->currentMatch == nullptr) {
+//            return false;
+//        }
+//        T.insertControlPoint(this->position, 0);
+//        T.insertControlPoint(this->currentMatch->position, 1);
+//        T.setEntryPoint(this);
+//        T.setExitPoint(this->currentMatch);
+//        this->setTrajectory(&T);
+//        this->currentMatch->setTrajectory(&T);
+//        return true;
+//    } else {
+//        return false;
+//    }
+//}
+
+Trajectory* BoundaryPoint::createTrajectory() {
     if (this->type == ENTRY) {
         if (this->currentMatch == nullptr) {
-            return false;
+            return nullptr;
         }
-        T.insertControlPoint(this->position, 0);
-        T.insertControlPoint(this->currentMatch->position, 1);
-        this->setTrajectory(&T);
-        this->currentMatch->setTrajectory(&T);
-        return true;
+        Trajectory* T = new Trajectory();
+        T->insertControlPoint(this->position, 0);
+        T->insertControlPoint(this->currentMatch->position, 1);
+        T->setEntryPoint(this);
+        T->setExitPoint(this->currentMatch);
+//        if (this->position[2] < 0.0001) {
+//            T->setStarting(true);
+//        }
+        this->setTrajectory(T);
+        if (this->currentMatch->getTrajectory() != nullptr) {
+            int dhuaisdf = 1;
+            dhuaisdf++;
+        }
+        this->currentMatch->setTrajectory(T);
+        return T;
     } else {
-        return false;
+        return nullptr;
     }
 }
 
@@ -293,4 +320,15 @@ BoundaryPoint* BoundaryPoint::getNextProposal() {
     } else {
         return nullptr;
     }
+}
+
+void BoundaryPoint::clear() {
+    this->trajectory = nullptr;
+    this->status = UNMATCHED;
+    this->currentMatch = nullptr;
+    this->counter = 0;
+    this->done = false;
+    this->preferenceList.clear();
+    this->ratingMap.clear();
+
 }

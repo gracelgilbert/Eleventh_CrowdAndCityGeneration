@@ -1,5 +1,5 @@
 #include "patchgraph.h"
-#define PERIOD 255.0
+#define PERIOD 120
 
 // Constructors
 PatchGraph::PatchGraph() : numPatches(0),
@@ -44,7 +44,7 @@ void PatchGraph::fillWithMaps(QImage densityMap, QImage flowMap) {
             QColor densityColor = densityMap.pixel(int(origin[0] + cellWidth/2.0), int(origin[1] + cellWidth/2.0));
             QColor flowColor   = flowMap.pixel(int(origin[0] + cellWidth/2.0), int(origin[1] + cellWidth/2.0));
 
-            float density = 0.5 * float(densityColor.red()) / 255.0;
+            float density = 0.2 * float(densityColor.red()) / 255.0;
 //            if (density > 0.1) {
 //                density = 0.1;
 //            }
@@ -53,10 +53,8 @@ void PatchGraph::fillWithMaps(QImage densityMap, QImage flowMap) {
             if (glm::length(flow) > 0) {
                 flow = glm::normalize(flow);
             }
-//            flow = glm::vec2(0.0);
-//            std::cout << density << std::endl;
-//            std::cout << flow[0] << ", " << flow[1] << std::endl;
-            if (density < 0.001) {
+
+            if (density < 0.00001) {
                 continue;
             }
 
@@ -430,23 +428,42 @@ void PatchGraph::addBPsAlongPath(std::vector<CrowdPatch*> path) {
         if (side == 1) {
             cp1->addLeftExit(exit);
             cp2->addRightEntry(entry);
+
+//            cp1->setLeftExitCount(cp1->getLeftExitCount() + 1);
+//            cp2->setRightEntryCount(cp2->getRightEntryCount() + 1);
+
         }
         if (side == 2) {
             cp1->addRightExit(exit);
             cp2->addLeftEntry(entry);
+
+//            cp1->setRightExitCount(cp1->getRightExitCount() + 1);
+//            cp2->setLeftEntryCount(cp2->getLeftEntryCount() + 1);
         }
         if (side == 3) {
             cp1->addUpExit(exit);
             cp2->addDownEntry(entry);
+
+//            cp1->setUpExitCount(cp1->getUpExitCount() + 1);
+//            cp2->setDownEntryCount(cp2->getDownEntryCount() + 1);
         }
         if (side == 4) {
             cp1->addDownExit(exit);
             cp2->addUpEntry(entry);
+
+//            cp1->setDownExitCount(cp1->getDownExitCount() + 1);
+//            cp2->setUpEntryCount(cp2->getUpEntryCount() + 1);
         }
     }
 }
 
 bool PatchGraph::isValidRemovalPath(std::vector<CrowdPatch *> path) {
+    for (int i = 0; i < int(this->graph.size()); ++i) {
+        CrowdPatch* currPatch = this->graph.at(i);
+        if (currPatch != nullptr) {
+            currPatch->resetBPCounts();
+        }
+    }
 //    bool validPath = true;
     for (int i = 0; i < int(path.size()) - 1; ++i) {
         CrowdPatch* cp1 = path.at(i);
@@ -454,39 +471,64 @@ bool PatchGraph::isValidRemovalPath(std::vector<CrowdPatch *> path) {
 
         if (cp1->getLeft() == cp2) {
             // cp2 | cp1
-            if (!(cp1->getLeftExits().size() > 0 &&
-                    cp2->getRightEntries().size() > 0)) {
+            if (cp1->getLeftExitCount() != cp2->getRightEntryCount()) {
+                std::cout << "uh oh" << std::endl;
+            }
+            if (!(cp1->getLeftExitCount() > 0 &&
+                    cp2->getRightEntryCount() > 0)) {
                 // There is no boundary point to remove
                 return false;
+            } else {
+                cp1->setLeftExitCount(cp1->getLeftExitCount() - 1);
+                cp2->setRightEntryCount(cp2->getRightEntryCount() - 1);
             }
 
         }
         else if (cp1->getRight() == cp2) {
             // cp1 | cp2
-            if (!(cp1->getRightExits().size() > 0 &&
-                    cp2->getLeftEntries().size() > 0)) {
+            if (cp1->getRightExitCount() != cp2->getLeftEntryCount()) {
+                std::cout << "uh oh" << std::endl;
+            }
+            if (!(cp1->getRightExitCount() > 0 &&
+                    cp2->getLeftEntryCount() > 0)) {
                 // There is no boundary point to remove
                 return false;
+            } else {
+                cp1->setRightExitCount(cp1->getRightExitCount() - 1);
+                cp2->setLeftEntryCount(cp2->getLeftEntryCount() - 1);
             }
         }
         else if (cp1->getUp() == cp2) {
             // cp2
             // cp1
-            if (!(cp1->getUpExits().size() > 0 &&
-                    cp2->getDownEntries().size() > 0)) {
+            if (cp1->getUpExitCount() != cp2->getDownEntryCount()) {
+                std::cout << "uh oh" << std::endl;
+            }
+            if (!(cp1->getUpExitCount() > 0 &&
+                    cp2->getDownEntryCount() > 0)) {
                 // There is no boundary point to remove
                 return false;
+            } else {
+                cp1->setUpExitCount(cp1->getUpExitCount() - 1);
+                cp2->setDownEntryCount(cp2->getDownEntryCount() - 1);
             }
         }
         else if (cp1->getDown() == cp2) {
             // cp1
             // cp2
-            if (!(cp1->getDownExits().size() > 0 &&
-                    cp2->getUpEntries().size() > 0)) {
+            if (cp1->getDownExitCount() != cp2->getUpEntryCount()) {
+                std::cout << "uh oh" << std::endl;
+            }
+            if (!(cp1->getDownExitCount() > 0 &&
+                    cp2->getUpEntryCount() > 0)) {
                 // There is no boundary point to remove
                 return false;
+            } else {
+                cp1->setDownExitCount(cp1->getDownExitCount() - 1);
+                cp2->setUpEntryCount(cp2->getUpEntryCount() - 1);
             }
         } else {
+            std::cout << "hm" << std::endl;
             return false;
         }
     }
@@ -496,6 +538,8 @@ bool PatchGraph::isValidRemovalPath(std::vector<CrowdPatch *> path) {
 
 void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
     if (isValidRemovalPath(path)) {
+//        std::cout << "removing" << std::endl;
+
         for (int i = 0; i < int(path.size()) - 1; ++i) {
             CrowdPatch* cp1 = path.at(i);
             CrowdPatch* cp2 = path.at(i + 1);
@@ -506,6 +550,9 @@ void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
                 BoundaryPoint* toRemove = cp1->getLeftExits().at(0);
                 if (toRemove == nullptr) {
                     std::cout << "hello" << std::endl;
+                }
+                if (toRemove->getNeighbor() == nullptr) {
+                    std::cout << "hello neighbor" << std::endl;
                 }
                 cp1->removeLeftExit(toRemove);
                 cp2->removeRightEntry(toRemove->getNeighbor());
@@ -521,6 +568,9 @@ void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
                 BoundaryPoint* toRemove = cp1->getRightExits().at(0);
                 if (toRemove == nullptr) {
                     std::cout << "hello" << std::endl;
+                }
+                if (toRemove->getNeighbor() == nullptr) {
+                    std::cout << "hello neighbor" << std::endl;
                 }
                 cp1->removeRightExit(toRemove);
                 cp2->removeLeftEntry(toRemove->getNeighbor());
@@ -538,6 +588,9 @@ void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
                 if (toRemove == nullptr) {
                     std::cout << "hello" << std::endl;
                 }
+                if (toRemove->getNeighbor() == nullptr) {
+                    std::cout << "hello neighbor" << std::endl;
+                }
                 cp1->removeUpExit(toRemove);
                 cp2->removeDownEntry(toRemove->getNeighbor());
 //                cp1->removeFromVector(cp1->getUpExits(), toRemove);
@@ -554,6 +607,9 @@ void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
                 if (toRemove == nullptr) {
                     std::cout << "hello" << std::endl;
                 }
+                if (toRemove->getNeighbor() == nullptr) {
+                    std::cout << "hello neighbor" << std::endl;
+                }
                 cp1->removeDownExit(toRemove);
                 cp2->removeUpEntry(toRemove->getNeighbor());
 //                cp1->removeFromVector(cp1->getDownExits(), toRemove);
@@ -565,6 +621,9 @@ void PatchGraph::removeBPsAlongPath(std::vector<CrowdPatch*> path) {
                 continue;
             }
         }
+    }
+    else {
+//        std::cout << "unable to remove" << std::endl;
     }
 }
 
@@ -579,20 +638,21 @@ void PatchGraph::resetTrajectories() {
                 continue;
             }
             currPatch->clearVecs();
-            for (BoundaryPoint* bp: currPatch->getEntryBPs()) {
-                bp->setTrajectory(nullptr);
-                bp->setStatus(UNMATCHED);
-                bp->setCurrentMatch(nullptr);
-                bp->resetCounter();
-                bp->setDone(false);
-
+            for (int b = 0; b < currPatch->getEntryBPs().size(); ++b) {
+//            for (BoundaryPoint* bp: currPatch->getEntryBPs()) {
+                BoundaryPoint* bp = currPatch->getEntryBPs().at(b);
+                bp->clear();
             }
-            for (BoundaryPoint* bp: currPatch->getExitBPs()) {
-                bp->setTrajectory(nullptr);
-                bp->setStatus(UNMATCHED);
-                bp->setCurrentMatch(nullptr);
-                bp->resetCounter();
-                bp->setDone(false);
+//            for (BoundaryPoint* bp: currPatch->getExitBPs()) {
+            for (int b = 0; b < currPatch->getExitBPs().size(); ++b) {
+                BoundaryPoint* bp = currPatch->getExitBPs().at(b);
+                bp->clear();
+            }
+//            for (Trajectory* T: currPatch->getTrajectories()) {
+            for (int t = 0; t < currPatch->getTrajectories().size(); ++t) {
+                Trajectory* T = currPatch->getTrajectories().at(t);
+                T->setEntryPoint(nullptr);
+                T->setExitPoint(nullptr);
             }
         }
     }

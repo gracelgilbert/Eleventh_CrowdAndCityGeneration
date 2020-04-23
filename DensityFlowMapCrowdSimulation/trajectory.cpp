@@ -2,7 +2,17 @@
 #include <iostream>
 
 // Constructor
-Trajectory::Trajectory() : controlPoints(std::vector<glm::vec3>()), parent(nullptr) {
+Trajectory::Trajectory() : controlPoints(std::vector<glm::vec3>()),
+                                         parent(nullptr),
+                                         previousTrajectory(nullptr),
+                                         nextTrajectory(nullptr),
+                                         entryPoint(nullptr),
+                                         exitPoint(nullptr),
+                                         swap(true),
+                                         startingTrajectory(false)
+{
+    this->ID = idTracker;
+    idTracker++;
 }
 
 // Getters
@@ -30,9 +40,57 @@ CrowdPatch* Trajectory::getParent() {
     return this->parent;
 }
 
+int Trajectory::getID() {
+    return this->ID;
+}
+
+Trajectory* Trajectory::getPreviousTrajectory() {
+    return this->previousTrajectory;
+}
+
+Trajectory* Trajectory::getNextTrajectory() {
+    return this->nextTrajectory;
+}
+
+BoundaryPoint* Trajectory::getEntryPoint() {
+    return this->entryPoint;
+}
+
+BoundaryPoint* Trajectory::getExitPoint() {
+    return this->exitPoint;
+}
+
+bool Trajectory::getStarting() {
+    return this->startingTrajectory;
+}
+
 // Setters
 void Trajectory::setParent(CrowdPatch *p) {
     this->parent = p;
+}
+
+void Trajectory::setID(int id) {
+    this->ID = id;
+}
+
+void Trajectory::setPreviousTrajectory(Trajectory *t) {
+    this->previousTrajectory = t;
+}
+
+void Trajectory::setNextTrajectory(Trajectory *t) {
+    this->nextTrajectory = t;
+}
+
+void Trajectory::setEntryPoint(BoundaryPoint *bp) {
+    this->entryPoint = bp;
+}
+
+void Trajectory::setExitPoint(BoundaryPoint *bp) {
+    this->exitPoint = bp;
+}
+
+void Trajectory::setStarting(bool start) {
+    this->startingTrajectory = start;
 }
 
 // Modifiers
@@ -126,9 +184,9 @@ void Trajectory::addBump() {
     }
 }
 
-void Trajectory::split() {
+bool Trajectory::split(Trajectory* split) {
     if (this->getNumControlPoints() > 2) {
-        return;
+        return false;
     }
     glm::vec2 cpFirst = this->getPositionAtIndex(0);
     glm::vec2 cpSecond = this->getPositionAtIndex(1);
@@ -145,15 +203,25 @@ void Trajectory::split() {
         float totalTime = laterSecond - tFirst;
 
         glm::vec2 posAtPeriod = (timeToPeriod / totalTime) * cpSecond +
-                (1 - timeToPeriod / totalTime) * cpFirst;
+                (1 - (timeToPeriod / totalTime)) * cpFirst;
 
-        Trajectory split = Trajectory();
-        split.insertControlPoint(glm::vec3(posAtPeriod[0], posAtPeriod[1], 0), 0);
-        split.insertControlPoint(this->getControlPointAtIndex(1), 1);
-        split.setParent(this->parent);
-        this->controlPoints.at(1) = glm::vec3(posAtPeriod[0], posAtPeriod[1], period - 1.0);
-        this->parent->addTrajectory(split);
+//        Trajectory* split = new Trajectory();
+        split->insertControlPoint(this->getControlPointAtIndex(0), 0);
+        split->insertControlPoint(glm::vec3(posAtPeriod[0], posAtPeriod[1], period), 1);
 
+        split->setParent(this->parent);
+        split->setPreviousTrajectory(this->getPreviousTrajectory());
+        split->setNextTrajectory(this);
+        this->getPreviousTrajectory()->setNextTrajectory(split);
+
+        this->controlPoints.at(0) = glm::vec3(posAtPeriod[0], posAtPeriod[1], 0);
+        this->setStarting(true);
+        this->setPreviousTrajectory(split);
+
+//        this->parent->addTrajectory(split);
+        return true;
+    } else {
+        return false;
     }
 
 //    int numControlPoints = this->getNumControlPoints();
@@ -165,6 +233,37 @@ void Trajectory::split() {
 
 //        }
 //    }
+}
+
+void Trajectory::curve() {
+    glm::vec2 prevVel = glm::normalize(this->getPreviousTrajectory()->getVelocity());
+//    float prevTime = this->getDuration();
+//    glm::vec3 frontSlope = glm::normalize(glm::vec3(prevVel[0], prevVel[1], prevTime));
+//    frontSlope = glm::vec3(1.0);
+
+    glm::vec2 nextVel = glm::normalize(this->getNextTrajectory()->getVelocity());
+//    float nextTime = this->getDuration();
+//    glm::vec3 backSlope = glm::normalize(glm::vec3(nextVel[0], nextVel[1], nextTime));
+//    backSlope = glm::vec3(1.0);
+
+    glm::vec3 cp0 = this->getControlPointAtIndex(0);
+    glm::vec3 cp1 = this->getControlPointAtIndex(this->getNumControlPoints() - 1);
+    float length = glm::length(cp1 - cp0);
+
+    float scale = 0.01f;
+    glm::vec3 frontSlope = glm::vec3(prevVel[0] * length * scale, prevVel[1] * length * scale, this->getDuration() * 0.33f);
+    glm::vec3 backSlope = glm::vec3(nextVel[0] * length * scale, nextVel[1] * length * scale, this->getDuration() * 0.33f);
+
+
+    glm::vec3 frontCP = cp0 + frontSlope;
+    glm::vec3 backCP = cp1 - backSlope;
+//    frontCP[2] = cp0[2] + this->getDuration() * 0.33f;
+//    backCP[2] = cp1[2] - this->getDuration() * 0.33f;
+
+    this->insertControlPoint(backCP, 1);
+    this->insertControlPoint(frontCP, 1);
+
+
 }
 
 

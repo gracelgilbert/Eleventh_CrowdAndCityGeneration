@@ -5,6 +5,7 @@
 #include "crowdpatch.h"
 
 class CrowdPatch;
+class BoundaryPoint;
 
 class Trajectory {
 
@@ -19,9 +20,18 @@ private:
     std::vector<glm::vec3> controlPoints;
 
     CrowdPatch* parent;
+    static int idTracker;
+    int ID;
+    Trajectory* previousTrajectory;
+    Trajectory* nextTrajectory;
+    BoundaryPoint* entryPoint;
+    BoundaryPoint* exitPoint;
+    bool startingTrajectory;
 public:
     // Constructor
     Trajectory();
+
+    bool swap;
 
     // Getters
     std::vector<glm::vec3>& getControlPoints();
@@ -30,9 +40,21 @@ public:
     glm::vec2 getPositionAtIndex(int index);
     float getTimeAtIndex(int index);
     CrowdPatch* getParent();
+    int getID();
+    Trajectory* getPreviousTrajectory();
+    Trajectory* getNextTrajectory();
+    BoundaryPoint* getEntryPoint();
+    BoundaryPoint* getExitPoint();
+    bool getStarting();
 
     // Setters
     void setParent(CrowdPatch* p);
+    void setID(int id);
+    void setPreviousTrajectory(Trajectory* t);
+    void setNextTrajectory(Trajectory* t);
+    void setEntryPoint(BoundaryPoint* bp);
+    void setExitPoint(BoundaryPoint* bp);
+    void setStarting(bool start);
 
     // Modifiers
     void insertControlPoint(glm::vec3 cp, int insertPos);
@@ -46,7 +68,8 @@ public:
     // Operations
     void straighten(int amt);
     void addBump();
-    void split();
+    bool split(Trajectory* split);
+    void curve();
 
 };
 
